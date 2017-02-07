@@ -37,14 +37,14 @@ func createDb() {
 	checkErr(err)
 	res, err = stmt.Exec("InField")
 	checkErr(err)
-	res, err = db.Exec("CREATE TABLE people (id INTEGER PRIMARY KEY, username TEXT, name TEXT, status int REFERENCES status(id), notes TEXT)")
+	res, err = db.Exec("CREATE TABLE people (id INTEGER PRIMARY KEY, username TEXT UNIQUE, name TEXT, status int REFERENCES status(id), notes TEXT)")
 	stmt, err = db.Prepare("INSERT INTO people (username, name, status, notes) VALUES (?,?,?,?)")
 	stmt.Exec("eartburm", "David", 0, "Blarg!")
 	checkErr(err)
 
 }
 
-func GetUsers() []Person {
+func GetUsers() ([]*Person, error) {
 	if conn == nil {
 		createDb()
 	}
@@ -52,24 +52,88 @@ func GetUsers() []Person {
 	rows, err := conn.Query("SELECT * FROM people")
 	checkErr(err)
 
-	var people []Person
 	var id int
 	var username string
 	var name string
 	var notes string
 	var status Status
+	var people []*Person
+	var statusValue string = "Out"
 
 	for rows.Next() {
 		err = rows.Scan(&id, &username, &name, &status, &notes)
+		switch status {
+		case In:
+			statusValue = "In"
+		case Out:
+			statusValue = "Out"
+		case InField:
+			statusValue = "In Field"
+		}
 		checkErr(err)
-		p := Person{
+		p := &Person{
+			ID:          id,
+			Name:        name,
+			Username:    username,
+			Status:      status,
+			StatusValue: statusValue,
+			Remarks:     notes}
+		people = append(people, p)
+	}
+	fmt.Printf("Got %d people from the db\n", len(people))
+	rows.Close()
+
+	return people, nil
+}
+
+func GetPerson(username string) (*Person, error) {
+	if conn == nil {
+		createDb()
+	}
+	var person *Person
+	var id int
+	var uname string
+	var name string
+	var status Status
+	var notes string
+
+	stmt, err := conn.Prepare("SELECT * FROM people WHERE username = ?")
+	checkErr(err)
+	rows, err := stmt.Query(username)
+	checkErr(err)
+
+	if rows.Next() {
+		err = rows.Scan(&id, &uname, &name, &status, &notes)
+		checkErr(err)
+		person = &Person{
+			ID:       id,
 			Name:     name,
 			Username: username,
 			Status:   status,
-			Remarks:  notes}
-		people = append(people, p)
+			Remarks:  notes,
+		}
+	} else {
+		err = fmt.Errorf("No user named %s", username)
+		person = nil
 	}
 	rows.Close()
 
-	return people
+	return person, err
+}
+
+func SetPerson(person *Person) error {
+	stmt, err := conn.Prepare("UPDATE people SET status = ?, notes = ? WHERE username = ?")
+	checkErr(err)
+	res, err := stmt.Exec(person.Status, person.Remarks, person.Username)
+	checkErr(err)
+
+	rows, err := res.RowsAffected()
+	checkErr(err)
+	if rows != 1 {
+		err = fmt.Errorf("Failed to update user %s", person.Username)
+	} else {
+		err = nil
+	}
+
+	return err
 }

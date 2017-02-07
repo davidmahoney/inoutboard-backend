@@ -1,8 +1,9 @@
 package main
 
 import (
-	"encoding/json"
+	//"encoding/json"
 	"fmt"
+	"github.com/google/jsonapi"
 	"net/http"
 )
 
@@ -15,39 +16,53 @@ const (
 )
 
 type Person struct {
-	Name     string
-	Username string
-	Status   Status
-	Remarks  string
-}
-
-func loadUser(username string) *Person {
-	fmt.Println("Request for user ", username)
-	user := Person{
-		Name:     "David",
-		Username: "dmahoney",
-		Status:   In,
-		Remarks:  "",
-	}
-	return &user
-}
-
-func loadUsers() []Person {
-	people := GetUsers()
-	return people
+	ID          int    `jsonapi:"primary,people"`
+	Name        string `jsonapi:"attr,name"`
+	Username    string `jsonapi:"attr,username"`
+	Status      Status `jsonapi:"attr,status"`
+	StatusValue string `jsonapi:"attr,statusvalue"`
+	Remarks     string `jsonapi:"attr,notes"`
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	var user = loadUser(r.URL.Path[len("/user/"):])
-	json.NewEncoder(w).Encode(user)
+	switch r.Method {
+	case "GET":
+		user, err := GetPerson(r.URL.Path[len("/user/"):])
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if err = jsonapi.MarshalOnePayload(w, user); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	case "POST":
+	}
+}
+
+func peopleHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://zaphod:4200")
+	w.Header().Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+	peopleInterface := make([]interface{}, 0)
+	people, err := GetUsers()
+	if err != nil {
+	}
+	for _, person := range people {
+		fmt.Printf("Person: %s\n", person.Name)
+		peopleInterface = append(peopleInterface, person)
+	}
+	fmt.Printf("GetUsers returned %d people\n", len(peopleInterface))
+	if err := jsonapi.MarshalManyPayload(w, peopleInterface); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	return
 }
 
 func main() {
 	createDb()
 	http.HandleFunc("/user/", handler)
-	http.HandleFunc("/users/", func(w http.ResponseWriter, r *http.Request) {
-		var users = loadUsers()
-		json.NewEncoder(w).Encode(users)
-	})
+	http.HandleFunc("/people/", peopleHandler)
+	http.HandleFunc("/people", peopleHandler)
 	http.ListenAndServe(":8080", nil)
 }
