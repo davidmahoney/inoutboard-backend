@@ -36,7 +36,14 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
-	case "POST":
+	case "PUT": // should probably actually return something
+		person := new(Person)
+		person := jsonapi.UnmarshalPayload(r.Body, person)
+		err := SetPerson(person)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
 	}
 }
 
