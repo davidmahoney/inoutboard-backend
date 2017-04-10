@@ -96,6 +96,7 @@ func GetPerson(username string) (*Person, error) {
 	var name string
 	var status Status
 	var notes string
+	var statusValue string = "Out"
 
 	stmt, err := conn.Prepare("SELECT * FROM people WHERE username = ?")
 	checkErr(err)
@@ -105,12 +106,21 @@ func GetPerson(username string) (*Person, error) {
 	if rows.Next() {
 		err = rows.Scan(&id, &uname, &name, &status, &notes)
 		checkErr(err)
+		switch status {
+		case In:
+			statusValue = "In"
+		case Out:
+			statusValue = "Out"
+		case InField:
+			statusValue = "In Field"
+		}
 		person = &Person{
-			ID:       id,
-			Name:     name,
-			Username: username,
-			Status:   status,
-			Remarks:  notes,
+			ID:          id,
+			Name:        name,
+			Username:    username,
+			Status:      status,
+			StatusValue: statusValue,
+			Remarks:     notes,
 		}
 	} else {
 		err = fmt.Errorf("No user named %s", username)

@@ -1,7 +1,7 @@
 package main
 
 import (
-	//"encoding/json"
+	"encoding/json"
 	"fmt"
 	"github.com/google/jsonapi"
 	"net/http"
@@ -32,14 +32,23 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		if err = jsonapi.MarshalOnePayload(w, user); err != nil {
+		//if err = jsonapi.MarshalOnePayload(w, user); err != nil {
+		//	http.Error(w, err.Error(), http.StatusInternalServerError)
+		//}
+		w.Header().Set("Access-Control-Allow-Origin", "http://zaphod:4200")
+		w.Header().Add("Access-Control-Allow-Methods", "GET, PUT, OPTIONS, HEAD")
+		w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+		if err = json.NewEncoder(w).Encode(user); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	case "PUT": // should probably actually return something
 		person := new(Person)
-		person := jsonapi.UnmarshalPayload(r.Body, person)
-		err := SetPerson(person)
+		err := jsonapi.UnmarshalPayload(r.Body, person)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		err = SetPerson(person)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -49,7 +58,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 func peopleHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://zaphod:4200")
-	w.Header().Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
+	w.Header().Add("Access-Control-Allow-Methods", "GET, PUT, OPTIONS, HEAD")
 	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
 	peopleInterface := make([]interface{}, 0)
 	people, err := GetUsers()
@@ -60,7 +69,10 @@ func peopleHandler(w http.ResponseWriter, r *http.Request) {
 		peopleInterface = append(peopleInterface, person)
 	}
 	fmt.Printf("GetUsers returned %d people\n", len(peopleInterface))
-	if err := jsonapi.MarshalManyPayload(w, peopleInterface); err != nil {
+	//if err := jsonapi.MarshalManyPayload(w, peopleInterface); err != nil {
+	//	http.Error(w, err.Error(), http.StatusInternalServerError)
+	//}
+	if err := json.NewEncoder(w).Encode(peopleInterface); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	return
