@@ -2,47 +2,120 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
+	"log"
 )
 
 var conn *sql.DB
 
-func Init() {
+func init() {
+	log.Println("Creating database...")
 	createDb()
+}
+
+func ValidateSession(sessionID string) (string, error) {
+	stmt, err := conn.Prepare("SELECT username FROM sessions JOIN people ON (person_id = people.id) WHERE sessions.id = ?")
+	checkErr(err)
+	res, err := stmt.Query(sessionID)
+	checkErr(err)
+	var username string
+	rows := 0
+	for res.Next() {
+		if err = res.Scan(&username); res != nil {
+			return "", err
+		}
+		rows++
+	}
+	if rows == 1 {
+		return username, nil
+	} else {
+		return "", errors.New("session not found")
+	}
+}
+
+func CreateSession(sessionID string, userID int) error {
+	stmt, err := conn.Prepare("INSERT INTO sessions (id, person_id) VALUES (?, ?)")
+	checkErr(err)
+	stmt.Exec(sessionID, userID)
+	checkErr(err)
+	return err
+}
+
+func RemoveSession(sessionID string) error {
+	stmt, err := conn.Prepare("DELETE FROM sessions WHERE id = ?")
+	checkErr(err)
+	_, err = stmt.Exec(sessionID)
+	checkErr(err)
+	return err
 }
 
 func checkErr(err error) {
 	if err != nil {
 		fmt.Printf(err.Error())
-		fmt.Println("Noooooo!\n")
+		fmt.Println(" Noooooo!\n")
 	}
 }
 
+func AddPerson(username string, name string, department string, phone string) error {
+	stmt, err := conn.Prepare("INSERT INTO people (username, name, status) VALUES (?, ?, ?)")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = stmt.Exec(username, name, Out)
+	return err
+}
+
 func createDb() {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite3", "db.sqlite")
 	checkErr(err)
 	conn = db
-	res, err := db.Exec("CREATE TABLE status (id INTEGER PRIMARY KEY, value TEXT)")
-	checkErr(err)
-	stmt, err := db.Prepare("INSERT INTO status (value) VALUES (?)")
-	checkErr(err)
-	res, err = stmt.Exec("In")
-	rows, err := res.RowsAffected()
-	if rows == 0 {
-		panic(err)
-	}
-	checkErr(err)
-	res, err = stmt.Exec("Out")
-	checkErr(err)
-	res, err = stmt.Exec("InField")
-	checkErr(err)
-	res, err = db.Exec("CREATE TABLE people (id INTEGER PRIMARY KEY, username TEXT UNIQUE, name TEXT, status int REFERENCES status(id), notes TEXT)")
-	stmt, err = db.Prepare("INSERT INTO people (username, name, status, notes) VALUES (?,?,?,?)")
-	stmt.Exec("eartburm", "David", 0, "Blarg!")
-	stmt.Exec("srich", "Sloane", 0, "Yes, it's true")
-	checkErr(err)
 
+	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type = 'table'")
+	tables := make(map[string]string)
+	var table string
+	checkErr(err)
+	for rows.Next() {
+		err = rows.Scan(&table)
+		checkErr(err)
+		log.Printf("found table %s", table)
+		tables[table] = table
+	}
+
+	if _, ok := tables["status"]; !ok {
+		log.Print("creating status table")
+		res, err := db.Exec("CREATE TABLE status (id INTEGER PRIMARY KEY, value TEXT)")
+		checkErr(err)
+		log.Print("insert status values")
+		stmt, err := db.Prepare("INSERT INTO status (value) VALUES (?)")
+		checkErr(err)
+		res, err = stmt.Exec("In")
+		rows, err := res.RowsAffected()
+		if rows == 0 {
+			panic(err)
+		}
+		checkErr(err)
+		res, err = stmt.Exec("Out")
+		checkErr(err)
+		res, err = stmt.Exec("InField")
+		checkErr(err)
+	}
+	log.Print("creating people table")
+	if _, ok := tables["people"]; !ok {
+		_, err = db.Exec("CREATE TABLE people (id INTEGER PRIMARY KEY, username TEXT UNIQUE, name TEXT NOT NULL, status int REFERENCES status(id), notes TEXT DEFAULT '')")
+		stmt, err := db.Prepare("INSERT INTO people (username, name, status, notes) VALUES (?,?,?,?)")
+		stmt.Exec("eartburm", "David", 0, "Blarg!")
+		stmt.Exec("srich", "Sloane", 0, "Yes, it's true")
+		checkErr(err)
+	}
+	if _, ok := tables["sessions"]; !ok {
+		log.Print("creating sessions table")
+		stmt, err := db.Prepare("CREATE TABLE sessions (id text PRIMARY KEY, person_id INTEGER REFERENCES people(id), create_time DATETIME DEFAULT CURRENT_TIMESTAMP)")
+		_, err = stmt.Exec()
+		checkErr(err)
+	}
 }
 
 func GetUsers() ([]*Person, error) {

@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/goji/httpauth"
+	"log"
 	"net/http"
 )
 
@@ -16,27 +16,28 @@ const (
 )
 
 type Person struct {
-	ID          int    `jsonapi:"primary,people"`
-	Name        string `jsonapi:"attr,name"`
-	Username    string `jsonapi:"attr,username"`
-	Status      Status `jsonapi:"attr,status"`
-	StatusValue string `jsonapi:"attr,statusvalue"`
-	Remarks     string `jsonapi:"attr,notes"`
+	ID          int
+	Name        string
+	Username    string
+	Status      Status
+	StatusValue string
+	Remarks     string
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4050")
 	w.Header().Add("Access-Control-Allow-Methods", "GET, PUT, OPTIONS, HEAD")
 	w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Authorization")
-	w.Header().Add("Access-Control-Allow-Credentials", "true")
+	username := usernameFromContext(r.Context())
+
 	switch r.Method {
 	case "GET":
 		var user *Person
 		var err error
-		username, _, _ := r.BasicAuth()
 		if r.URL.Path[len("/user/"):] != "" {
 			user, err = GetPerson(r.URL.Path[len("/user/"):])
 		} else {
+			log.Printf("user from context: %s", username)
 			user, err = GetPerson(username)
 		}
 		if err != nil {
@@ -47,7 +48,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
-	case "PUT": // should probably actually return something
+	case "PUT":
 		fmt.Printf("Saving user...\n")
 		person := new(Person)
 		err := json.NewDecoder(r.Body).Decode(person)
@@ -70,43 +71,47 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func peopleHandler(w http.ResponseWriter, r *http.Request) {
-	user, _, _ := r.BasicAuth()
-	fmt.Printf("User is %s\n", user)
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4050")
-	w.Header().Add("Access-Control-Allow-Methods", "GET, PUT, OPTIONS, HEAD")
+	w.Header().Add("Access-Control-Allow-Methods", "GET, OPTIONS, HEAD")
 	w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Authorization")
-	w.Header().Add("Access-Control-Allow-Credentials", "true")
-	if r.Method == "OPTIONS" {
-		return
-	}
+	switch r.Method {
+	case "OPTIONS":
+		break
 
-	peopleInterface := make([]interface{}, 0)
-	people, err := GetUsers()
-	if err != nil {
-	}
-	for _, person := range people {
-		fmt.Printf("Person: %s\n", person.Name)
-		peopleInterface = append(peopleInterface, person)
-	}
-	fmt.Printf("GetUsers returned %d people\n", len(peopleInterface))
-	//if err := jsonapi.MarshalManyPayload(w, peopleInterface); err != nil {
-	//	http.Error(w, err.Error(), http.StatusInternalServerError)
-	//}
-	if err := json.NewEncoder(w).Encode(peopleInterface); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	case "GET":
+		peopleInterface := make([]interface{}, 0)
+		people, err := GetUsers()
+		if err != nil {
+		}
+		for _, person := range people {
+			fmt.Printf("Person: %s\n", person.Name)
+			peopleInterface = append(peopleInterface, person)
+		}
+		fmt.Printf("GetUsers returned %d people\n", len(peopleInterface))
+
+		if err := json.NewEncoder(w).Encode(peopleInterface); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	default:
+		http.Error(w, "", http.StatusMethodNotAllowed)
 	}
 	return
 }
 
 func main() {
 	createDb()
-	authOpts := httpauth.AuthOptions{
-		Realm:               "rdffg",
-		AuthFunc:            ldapAuthFunc,
-		UnauthorizedHandler: http.HandlerFunc(unauthorizedHandler),
+
+	authOptions := AuthorizationOptions{
+		realm:          "example.com",
+		ldapServer:     "myldapserver",
+		port:           389,
+		username:       "inoutboard",
+		password:       "",
+		ldapSearchBase: "",
 	}
-	http.Handle("/user/", httpauth.BasicAuth(authOpts)(http.HandlerFunc(handler)))
-	http.Handle("/people/", httpauth.BasicAuth(authOpts)(http.HandlerFunc(peopleHandler)))
-	http.Handle("/people", httpauth.BasicAuth(authOpts)(http.HandlerFunc(peopleHandler)))
+
+	http.Handle("/user/", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(handler))))
+	http.Handle("/people/", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))))
+	http.Handle("/people", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))))
 	http.ListenAndServe(":8080", nil)
 }
