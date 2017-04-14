@@ -14,8 +14,8 @@ func Init() {
 
 func checkErr(err error) {
 	if err != nil {
+		fmt.Printf(err.Error())
 		fmt.Println("Noooooo!\n")
-		panic(err)
 	}
 }
 
@@ -40,6 +40,7 @@ func createDb() {
 	res, err = db.Exec("CREATE TABLE people (id INTEGER PRIMARY KEY, username TEXT UNIQUE, name TEXT, status int REFERENCES status(id), notes TEXT)")
 	stmt, err = db.Prepare("INSERT INTO people (username, name, status, notes) VALUES (?,?,?,?)")
 	stmt.Exec("eartburm", "David", 0, "Blarg!")
+	stmt.Exec("srich", "Sloane", 0, "Yes, it's true")
 	checkErr(err)
 
 }
