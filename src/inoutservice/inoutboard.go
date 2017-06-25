@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"gopkg.in/gcfg.v1"
 	"log"
 	"net/http"
 )
@@ -101,13 +102,21 @@ func peopleHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	createDb()
 
+	var cfg Config
+	err := gcfg.ReadFileInto(&cfg, "config.ini")
+	if err != nil {
+		panic("could not open config.ini")
+	}
+
+	log.Printf("config ldapServer: %s", cfg.Auth.LdapServer)
+
 	authOptions := AuthorizationOptions{
-		realm:          "example.com",
-		ldapServer:     "myldapserver",
-		port:           389,
-		username:       "inoutboard",
-		password:       "",
-		ldapSearchBase: "",
+		realm:          cfg.Auth.Realm,
+		ldapServer:     cfg.Auth.LdapServer,
+		port:           cfg.Auth.LdapPort,
+		username:       cfg.Auth.Username,
+		password:       cfg.Auth.BindPassword,
+		ldapSearchBase: cfg.Auth.LdapSearchBase,
 	}
 
 	http.Handle("/user/", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(handler))))

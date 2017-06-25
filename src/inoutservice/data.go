@@ -23,7 +23,7 @@ func ValidateSession(sessionID string) (string, error) {
 	var username string
 	rows := 0
 	for res.Next() {
-		if err = res.Scan(&username); res != nil {
+		if err = res.Scan(&username); err != nil {
 			return "", err
 		}
 		rows++

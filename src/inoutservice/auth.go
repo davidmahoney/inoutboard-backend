@@ -45,7 +45,7 @@ func init() {
 // LdapAuthFunc authenticates a user against an LDAP server
 // The Request parameter is probably not necessary.
 func LdapAuthFunc(creds *Credentials) bool {
-	hostaddr := fmt.Sprintf("%s:%d", "rdffg-dc1", 389) // move to config file
+	hostaddr := fmt.Sprintf("%s:%d", authOptions.ldapServer, authOptions.port) // move to config file
 	conn, err := ldap.Dial("tcp", hostaddr)
 	if err != nil {
 		log.Fatal(err)
@@ -60,9 +60,9 @@ func LdapAuthFunc(creds *Credentials) bool {
 
 	err = conn.Bind(authOptions.realm+"\\"+creds.Username, creds.Password)
 	if err == nil {
-		log.Printf("User %s logged in\n", creds.Username)
 		return true
 	} else {
+		log.Printf("LDAP: %s", err.Error())
 		return false
 	}
 }
@@ -126,7 +126,6 @@ func AuthorizationMiddleware(options AuthorizationOptions, next http.Handler) ht
 		}
 
 		if username, err := ValidateSession(session); err == nil {
-			log.Printf("username %s", username)
 			next.ServeHTTP(w, r.WithContext(newContextWithUsername(r.Context(), username)))
 		} else {
 			log.Println("no session found")
@@ -180,6 +179,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 				log.Fatalf("Failed to create user: %s", err.Error())
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
+			log.Printf("Created user")
 			if person, err = GetPerson(creds.Username); err != nil {
 				log.Fatal(err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -189,12 +189,14 @@ func Login(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		log.Printf("created session %s", session)
 
 		cookie := &http.Cookie{Name: "session", Value: session, HttpOnly: false}
 		http.SetCookie(w, cookie)
 		w.Write([]byte("success"))
 
 	} else {
+		log.Printf("login failed")
 		sessionErr := Error{message: "login failed", path: "/login"}
 		if err := json.NewEncoder(w).Encode(sessionErr); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -208,14 +210,11 @@ type requestKey int
 const requestUsernameKey = 0
 
 func usernameFromContext(ctx context.Context) string {
-	log.Printf("get username from context")
 	return ctx.Value(requestUsernameKey).(string)
 }
 
 func newContextWithUsername(ctx context.Context, username string) context.Context {
-	log.Printf("set username to context")
 	u := context.WithValue(ctx, requestUsernameKey, username).Value(requestUsernameKey).(string)
-	log.Printf("set username to %s", u)
 	return context.WithValue(ctx, requestUsernameKey, username)
 }
 
