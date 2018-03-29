@@ -16,8 +16,8 @@ import (
 var authOptions *AuthorizationOptions
 
 type Error struct {
-	message string
-	path    string
+	Message string
+	Path    string
 }
 
 type AuthorizationOptions struct {
@@ -129,7 +129,10 @@ func AuthorizationMiddleware(options AuthorizationOptions, next http.Handler) ht
 			next.ServeHTTP(w, r.WithContext(newContextWithUsername(r.Context(), username)))
 		} else {
 			log.Println("no session found")
-			sessionErr := Error{message: "unauthorized", path: "/login"}
+			sessionErr := &Error{Message: "unauthorized", Path: "/login"}
+			log.Printf(sessionErr.Message)
+			content, _ := json.Marshal(sessionErr)
+			http.Error(w, string(content), http.StatusUnauthorized)
 			if err := json.NewEncoder(w).Encode(sessionErr); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
@@ -197,7 +200,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	} else {
 		log.Printf("login failed")
-		sessionErr := Error{message: "login failed", path: "/login"}
+		sessionErr := Error{Message: "login failed", Path: "/login"}
 		if err := json.NewEncoder(w).Encode(sessionErr); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -214,7 +217,6 @@ func usernameFromContext(ctx context.Context) string {
 }
 
 func newContextWithUsername(ctx context.Context, username string) context.Context {
-	u := context.WithValue(ctx, requestUsernameKey, username).Value(requestUsernameKey).(string)
 	return context.WithValue(ctx, requestUsernameKey, username)
 }
 

@@ -35,8 +35,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		var user *Person
 		var err error
-		if r.URL.Path[len("/user/"):] != "" {
-			user, err = GetPerson(r.URL.Path[len("/user/"):])
+		log.Printf(r.URL.Path)
+		if r.URL.Path[len("user/"):] != "" {
+			user, err = GetPerson(r.URL.Path[len("user/"):])
 		} else {
 			log.Printf("user from context: %s", username)
 			user, err = GetPerson(username)
@@ -54,7 +55,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		person := new(Person)
 		err := json.NewDecoder(r.Body).Decode(person)
 
-		username, _, _ := r.BasicAuth()
 		if username != person.Username {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -119,8 +119,10 @@ func main() {
 		ldapSearchBase: cfg.Auth.LdapSearchBase,
 	}
 
-	http.Handle("/user/", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(handler))))
-	http.Handle("/people/", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))))
-	http.Handle("/people", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))))
+	http.Handle("/api/user/", AuthorizationMiddleware(authOptions, AddHeaders(http.StripPrefix("/api/", http.HandlerFunc(handler)))))
+	http.Handle("/api/people/", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))))
+	http.Handle("/api/people", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))))
+	fs := http.FileServer(http.Dir("static"))
+	http.Handle("/", fs)
 	http.ListenAndServe(":8080", nil)
 }
