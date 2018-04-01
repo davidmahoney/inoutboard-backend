@@ -124,7 +124,7 @@ func GetUsers() ([]*Person, error) {
 		createDb()
 	}
 
-	rows, err := conn.Query("SELECT id, username, name, department, status, notes FROM people")
+	rows, err := conn.Query("SELECT id, username, name, department, status, notes FROM people ORDER BY department, name")
 	checkErr(err)
 
 	var id int

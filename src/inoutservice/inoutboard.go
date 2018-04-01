@@ -56,10 +56,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		person := new(Person)
 		err := json.NewDecoder(r.Body).Decode(person)
 
-		if username != person.Username {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
 		if err != nil {
 			fmt.Printf(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
