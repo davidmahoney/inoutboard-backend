@@ -59,12 +59,12 @@ func checkErr(err error) {
 }
 
 func AddPerson(username string, name string, department string, phone string) error {
-	stmt, err := conn.Prepare("INSERT INTO people (username, name, status) VALUES (?, ?, ?)")
+	stmt, err := conn.Prepare("INSERT INTO people (username, name, status, department) VALUES (?, ?, ?, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	_, err = stmt.Exec(username, name, Out)
+	_, err = stmt.Exec(username, name, Out, department)
 	return err
 }
 
@@ -104,7 +104,7 @@ func createDb() {
 	}
 	log.Print("creating people table")
 	if _, ok := tables["people"]; !ok {
-		_, err = db.Exec("CREATE TABLE people (id INTEGER PRIMARY KEY, username TEXT UNIQUE, name TEXT NOT NULL, status int REFERENCES status(id), notes TEXT DEFAULT '')")
+		_, err = db.Exec("CREATE TABLE people (id INTEGER PRIMARY KEY, username TEXT UNIQUE, name TEXT NOT NULL, department TEXT null, status int REFERENCES status(id), notes TEXT DEFAULT '')")
 		stmt, err := db.Prepare("INSERT INTO people (username, name, status, notes) VALUES (?,?,?,?)")
 		stmt.Exec("eartburm", "David", 0, "Blarg!")
 		stmt.Exec("srich", "Sloane", 0, "Yes, it's true")
@@ -119,23 +119,25 @@ func createDb() {
 }
 
 func GetUsers() ([]*Person, error) {
+	log.Print("GetUsers")
 	if conn == nil {
 		createDb()
 	}
 
-	rows, err := conn.Query("SELECT * FROM people")
+	rows, err := conn.Query("SELECT id, username, name, department, status, notes FROM people")
 	checkErr(err)
 
 	var id int
 	var username string
 	var name string
+	var department sql.NullString
 	var notes string
 	var status Status
 	var people []*Person
 	var statusValue string = "Out"
 
 	for rows.Next() {
-		err = rows.Scan(&id, &username, &name, &status, &notes)
+		err = rows.Scan(&id, &username, &name, &department, &status, &notes)
 		switch status {
 		case In:
 			statusValue = "In"
@@ -149,6 +151,7 @@ func GetUsers() ([]*Person, error) {
 			ID:          id,
 			Name:        name,
 			Username:    username,
+			Department:  department.String,
 			Status:      status,
 			StatusValue: statusValue,
 			Remarks:     notes}
@@ -161,6 +164,7 @@ func GetUsers() ([]*Person, error) {
 }
 
 func GetPerson(username string) (*Person, error) {
+	log.Print("GetPerson")
 	if conn == nil {
 		createDb()
 	}
@@ -170,15 +174,16 @@ func GetPerson(username string) (*Person, error) {
 	var name string
 	var status Status
 	var notes string
+	var department string
 	var statusValue string = "Out"
 
-	stmt, err := conn.Prepare("SELECT * FROM people WHERE username = ?")
+	stmt, err := conn.Prepare("SELECT id, username, name, department, status, notes FROM people WHERE username = ?")
 	checkErr(err)
 	rows, err := stmt.Query(username)
 	checkErr(err)
 
 	if rows.Next() {
-		err = rows.Scan(&id, &uname, &name, &status, &notes)
+		err = rows.Scan(&id, &uname, &name, &department, &status, &notes)
 		checkErr(err)
 		switch status {
 		case In:
@@ -192,6 +197,7 @@ func GetPerson(username string) (*Person, error) {
 			ID:          id,
 			Name:        name,
 			Username:    username,
+			Department:  department,
 			Status:      status,
 			StatusValue: statusValue,
 			Remarks:     notes,

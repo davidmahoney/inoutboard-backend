@@ -20,6 +20,7 @@ type Person struct {
 	ID          int
 	Name        string
 	Username    string
+	Department  string
 	Status      Status
 	StatusValue string
 	Remarks     string
