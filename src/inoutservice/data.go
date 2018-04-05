@@ -104,10 +104,7 @@ func createDb() {
 	}
 	log.Print("creating people table")
 	if _, ok := tables["people"]; !ok {
-		_, err = db.Exec("CREATE TABLE people (id INTEGER PRIMARY KEY, username TEXT UNIQUE, name TEXT NOT NULL, department TEXT null, status int REFERENCES status(id), notes TEXT DEFAULT '')")
-		stmt, err := db.Prepare("INSERT INTO people (username, name, status, notes) VALUES (?,?,?,?)")
-		stmt.Exec("eartburm", "David", 0, "Blarg!")
-		stmt.Exec("srich", "Sloane", 0, "Yes, it's true")
+		_, err = db.Exec("CREATE TABLE people (id INTEGER PRIMARY KEY, username TEXT UNIQUE, name TEXT NOT NULL, department TEXT null, status int REFERENCES status(id), notes TEXT DEFAULT '', last_editor INTEGER NULL REFERENCES people(id)), p.last_edit_time datetime DEFAULT CURRENT_TIMESTAMP")
 		checkErr(err)
 	}
 	if _, ok := tables["sessions"]; !ok {
@@ -124,7 +121,10 @@ func GetUsers() ([]*Person, error) {
 		createDb()
 	}
 
-	rows, err := conn.Query("SELECT id, username, name, department, status, notes FROM people ORDER BY department, name")
+	rows, err := conn.Query(`SELECT p.id, p.username, p.name, p.department, p.status, p.notes, l.name, p.last_edit_time
+		FROM people p
+		LEFT JOIN people l ON p.last_editor = l.id
+		ORDER BY p.department, p.name`)
 	checkErr(err)
 
 	var id int
@@ -135,9 +135,11 @@ func GetUsers() ([]*Person, error) {
 	var status Status
 	var people []*Person
 	var statusValue string = "Out"
+	var lastEditor sql.NullString
+	var lastEditTime NullTime
 
 	for rows.Next() {
-		err = rows.Scan(&id, &username, &name, &department, &status, &notes)
+		err = rows.Scan(&id, &username, &name, &department, &status, &notes, &lastEditor, &lastEditTime)
 		switch status {
 		case In:
 			statusValue = "In"
@@ -154,7 +156,15 @@ func GetUsers() ([]*Person, error) {
 			Department:  department.String,
 			Status:      status,
 			StatusValue: statusValue,
-			Remarks:     notes}
+			Remarks:     notes,
+			LastEditor:  "",
+		}
+		if lastEditor.Valid {
+			p.LastEditor = lastEditor.String
+		}
+		if lastEditTime.Valid {
+			p.LastEditTime = lastEditTime.Time.Local()
+		}
 		people = append(people, p)
 	}
 	fmt.Printf("Got %d people from the db\n", len(people))
@@ -176,14 +186,17 @@ func GetPerson(username string) (*Person, error) {
 	var notes string
 	var department string
 	var statusValue string = "Out"
+	var lastEditor sql.NullString
+	var lastEditTime NullTime
 
-	stmt, err := conn.Prepare("SELECT id, username, name, department, status, notes FROM people WHERE username = ?")
+	stmt, err := conn.Prepare(`SELECT p.id, p.username, p.name, p.department, p.status, p.notes, l.name as last_editor, p.last_edit_time
+	FROM people p left join people l on l.id = p.last_editor WHERE p.username = ?`)
 	checkErr(err)
 	rows, err := stmt.Query(username)
 	checkErr(err)
 
 	if rows.Next() {
-		err = rows.Scan(&id, &uname, &name, &department, &status, &notes)
+		err = rows.Scan(&id, &uname, &name, &department, &status, &notes, &lastEditor, &lastEditTime)
 		checkErr(err)
 		switch status {
 		case In:
@@ -202,6 +215,12 @@ func GetPerson(username string) (*Person, error) {
 			StatusValue: statusValue,
 			Remarks:     notes,
 		}
+		if lastEditor.Valid {
+			person.LastEditor = lastEditor.String
+		}
+		if lastEditTime.Valid {
+			person.LastEditTime = lastEditTime.Time.Local()
+		}
 	} else {
 		err = fmt.Errorf("No user named %s", username)
 		person = nil
@@ -211,10 +230,10 @@ func GetPerson(username string) (*Person, error) {
 	return person, err
 }
 
-func SetPerson(person *Person) error {
-	stmt, err := conn.Prepare("UPDATE people SET status = ?, notes = ? WHERE username = ?")
+func SetPerson(person *Person, username string) error {
+	stmt, err := conn.Prepare("UPDATE people SET status = ?, notes = ?, last_editor = (select id from people where username = ?), last_edit_time = current_timestamp WHERE username = ?")
 	checkErr(err)
-	res, err := stmt.Exec(person.Status, person.Remarks, person.Username)
+	res, err := stmt.Exec(person.Status, person.Remarks, username, person.Username)
 	checkErr(err)
 
 	rows, err := res.RowsAffected()

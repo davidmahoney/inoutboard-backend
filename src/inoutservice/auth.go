@@ -161,7 +161,8 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 
 func Login(w http.ResponseWriter, r *http.Request) {
 	log.Println("Creating session")
-	session, err := gorand.UUID()
+	id, err := gorand.UUIDv4()
+	session, err := gorand.MarshalUUID(id)
 	if err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
 	}

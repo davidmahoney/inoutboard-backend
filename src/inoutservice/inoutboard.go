@@ -6,6 +6,7 @@ import (
 	"gopkg.in/gcfg.v1"
 	"log"
 	"net/http"
+	"time"
 )
 
 type Status int
@@ -17,13 +18,15 @@ const (
 )
 
 type Person struct {
-	ID          int
-	Name        string
-	Username    string
-	Department  string
-	Status      Status
-	StatusValue string
-	Remarks     string
+	ID           int
+	Name         string
+	Username     string
+	Department   string
+	Status       Status
+	StatusValue  string
+	Remarks      string
+	LastEditor   string
+	LastEditTime time.Time
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +63,15 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			fmt.Printf(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		err = SetPerson(person)
+		err = SetPerson(person, username)
+		updated, err := GetPerson(username)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		} else {
+			if err = json.NewEncoder(w).Encode(updated); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		}
 		return
 	case "OPTIONS":
 		return
