@@ -25,6 +25,9 @@ type Person struct {
 	Status       Status
 	StatusValue  string
 	Remarks      string
+	Mobile       string
+	Telephone    string
+	Office       string
 	LastEditor   string
 	LastEditTime time.Time
 }

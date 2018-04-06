@@ -58,13 +58,14 @@ func checkErr(err error) {
 	}
 }
 
-func AddPerson(username string, name string, department string, phone string) error {
-	stmt, err := conn.Prepare("INSERT INTO people (username, name, status, department) VALUES (?, ?, ?, ?)")
+func AddPerson(username string, name string, department string, telephone string, mobile string, office string) error {
+	stmt, err := conn.Prepare("INSERT INTO people (username, name, status, department, mobile, telephone, office) VALUES (?,?,?,?,?,?,?)")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	_, err = stmt.Exec(username, name, Out, department)
+	_, err = stmt.Exec(username, name, Out, department, mobile, telephone, office)
+	log.Printf("Added %s to the db", username)
 	return err
 }
 
@@ -104,7 +105,7 @@ func createDb() {
 	}
 	log.Print("creating people table")
 	if _, ok := tables["people"]; !ok {
-		_, err = db.Exec("CREATE TABLE people (id INTEGER PRIMARY KEY, username TEXT UNIQUE, name TEXT NOT NULL, department TEXT null, status int REFERENCES status(id), notes TEXT DEFAULT '', last_editor INTEGER NULL REFERENCES people(id)), p.last_edit_time datetime DEFAULT CURRENT_TIMESTAMP")
+		_, err = db.Exec("CREATE TABLE people (id INTEGER PRIMARY KEY, username TEXT UNIQUE, name TEXT NOT NULL, department TEXT null, mobile TEXT not null default '', telephone TEXT not null default '', office TEXT not null default '', status int REFERENCES status(id), notes TEXT DEFAULT '', last_editor INTEGER NULL REFERENCES people(id), last_edit_time datetime DEFAULT CURRENT_TIMESTAMP)")
 		checkErr(err)
 	}
 	if _, ok := tables["sessions"]; !ok {
@@ -121,7 +122,7 @@ func GetUsers() ([]*Person, error) {
 		createDb()
 	}
 
-	rows, err := conn.Query(`SELECT p.id, p.username, p.name, p.department, p.status, p.notes, l.name, p.last_edit_time
+	rows, err := conn.Query(`SELECT p.id, p.username, p.name, p.department, p.status, p.notes, p.telephone, p.mobile, p.office, l.name, p.last_edit_time
 		FROM people p
 		LEFT JOIN people l ON p.last_editor = l.id
 		ORDER BY p.department, p.name`)
@@ -133,13 +134,16 @@ func GetUsers() ([]*Person, error) {
 	var department sql.NullString
 	var notes string
 	var status Status
+	var telephone string
+	var mobile string
+	var office string
 	var people []*Person
 	var statusValue string = "Out"
 	var lastEditor sql.NullString
 	var lastEditTime NullTime
 
 	for rows.Next() {
-		err = rows.Scan(&id, &username, &name, &department, &status, &notes, &lastEditor, &lastEditTime)
+		err = rows.Scan(&id, &username, &name, &department, &status, &notes, &telephone, &mobile, &office, &lastEditor, &lastEditTime)
 		switch status {
 		case In:
 			statusValue = "In"
@@ -157,6 +161,9 @@ func GetUsers() ([]*Person, error) {
 			Status:      status,
 			StatusValue: statusValue,
 			Remarks:     notes,
+			Telephone:   telephone,
+			Mobile:      mobile,
+			Office:      office,
 			LastEditor:  "",
 		}
 		if lastEditor.Valid {
@@ -186,17 +193,20 @@ func GetPerson(username string) (*Person, error) {
 	var notes string
 	var department string
 	var statusValue string = "Out"
+	var office sql.NullString
+	var telephone sql.NullString
+	var mobile sql.NullString
 	var lastEditor sql.NullString
 	var lastEditTime NullTime
 
-	stmt, err := conn.Prepare(`SELECT p.id, p.username, p.name, p.department, p.status, p.notes, l.name as last_editor, p.last_edit_time
+	stmt, err := conn.Prepare(`SELECT p.id, p.username, p.name, p.department, p.status, p.notes, p.telephone, p.mobile, p.office, l.name as last_editor, p.last_edit_time
 	FROM people p left join people l on l.id = p.last_editor WHERE p.username = ?`)
 	checkErr(err)
 	rows, err := stmt.Query(username)
 	checkErr(err)
 
 	if rows.Next() {
-		err = rows.Scan(&id, &uname, &name, &department, &status, &notes, &lastEditor, &lastEditTime)
+		err = rows.Scan(&id, &uname, &name, &department, &status, &notes, &telephone, &mobile, &office, &lastEditor, &lastEditTime)
 		checkErr(err)
 		switch status {
 		case In:
@@ -220,6 +230,15 @@ func GetPerson(username string) (*Person, error) {
 		}
 		if lastEditTime.Valid {
 			person.LastEditTime = lastEditTime.Time.Local()
+		}
+		if telephone.Valid {
+			person.Telephone = telephone.String
+		}
+		if mobile.Valid {
+			person.Mobile = mobile.String
+		}
+		if office.Valid {
+			person.Office = office.String
 		}
 	} else {
 		err = fmt.Errorf("No user named %s", username)

@@ -93,7 +93,7 @@ func CreateUser(username string) error {
 		authOptions.ldapSearchBase,
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
 		fmt.Sprintf("(&(objectClass=organizationalPerson)(sAMAccountName=%s))", username),
-		[]string{"dn", "cn", "title", "department", "telephoneNumber"},
+		[]string{"dn", "cn", "title", "department", "telephoneNumber", "mobile", "physicalDeliveryOfficeName"},
 		nil,
 	)
 	res, err := conn.Search(searchRequest)
@@ -108,6 +108,8 @@ func CreateUser(username string) error {
 		ldapPerson.GetAttributeValue("cn"),
 		ldapPerson.GetAttributeValue("department"),
 		ldapPerson.GetAttributeValue("telephoneNumber"),
+		ldapPerson.GetAttributeValue("mobile"),
+		ldapPerson.GetAttributeValue("physicalDeliveryOfficeName"),
 	)
 	return err
 }
