@@ -67,6 +67,54 @@ func LdapAuthFunc(creds *Credentials) bool {
 	}
 }
 
+func FindUser(username string) (Person, error) {
+	var user Person
+	hostaddr := fmt.Sprintf("%s:%d", authOptions.ldapServer, authOptions.port)
+	conn, err := ldap.Dial("tcp", hostaddr)
+	if err != nil {
+		log.Fatal(err)
+		return user, err
+	}
+
+	defer conn.Close()
+
+	err = conn.StartTLS(&tls.Config{InsecureSkipVerify: true})
+	if err != nil {
+		log.Fatal(err)
+		return user, err
+	}
+
+	err = conn.Bind(authOptions.realm+"\\"+authOptions.username, authOptions.password)
+	if err != nil {
+		log.Fatal(err)
+		return user, err
+	}
+
+	searchRequest := ldap.NewSearchRequest(
+		authOptions.ldapSearchBase,
+		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+		fmt.Sprintf("(&(objectClass=organizationalPerson)(sAMAccountName=%s))", username),
+		[]string{"dn", "cn", "title", "department", "telephoneNumber", "mobile", "physicalDeliveryOfficeName"},
+		nil,
+	)
+	res, err := conn.Search(searchRequest)
+	if err != nil || len(res.Entries) != 1 {
+		log.Fatal(err)
+	}
+
+	ldapPerson := res.Entries[0]
+
+	user = Person{
+		Username:   username,
+		Name:       ldapPerson.GetAttributeValue("cn"),
+		Department: ldapPerson.GetAttributeValue("department"),
+		Telephone:  ldapPerson.GetAttributeValue("telephoneNumber"),
+		Mobile:     ldapPerson.GetAttributeValue("mobile"),
+		Office:     ldapPerson.GetAttributeValue("physicalDeliveryOfficeName"),
+	}
+	return user, err
+}
+
 func CreateUser(username string) error {
 	hostaddr := fmt.Sprintf("%s:%d", authOptions.ldapServer, authOptions.port)
 	conn, err := ldap.Dial("tcp", hostaddr)
@@ -112,6 +160,10 @@ func CreateUser(username string) error {
 		ldapPerson.GetAttributeValue("physicalDeliveryOfficeName"),
 	)
 	return err
+}
+
+func updateLdap(options AuthorizationOptions) error {
+	return nil
 }
 
 func AuthorizationMiddleware(options AuthorizationOptions, next http.Handler) http.Handler {

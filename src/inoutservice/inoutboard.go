@@ -6,6 +6,7 @@ import (
 	"gopkg.in/gcfg.v1"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -113,13 +114,19 @@ func peopleHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	createDb()
 
+	port := 8888
 	var cfg Config
 	err := gcfg.ReadFileInto(&cfg, "config.ini")
 	if err != nil {
+		log.Printf(err.Error())
 		panic("could not open config.ini")
 	}
 
 	log.Printf("config ldapServer: %s", cfg.Auth.LdapServer)
+
+	if cfg.Net.Port > 0 {
+		port = cfg.Net.Port
+	}
 
 	authOptions := AuthorizationOptions{
 		realm:          cfg.Auth.Realm,
@@ -130,10 +137,18 @@ func main() {
 		ldapSearchBase: cfg.Auth.LdapSearchBase,
 	}
 
+	if len(os.Args[1:]) > 0 { // found command-line args
+		if os.Args[1] == "--update-users" { // run ldap update
+			updateLdap(authOptions)
+			return
+		}
+	}
+
 	http.Handle("/api/user/", AuthorizationMiddleware(authOptions, AddHeaders(http.StripPrefix("/api/", http.HandlerFunc(handler)))))
 	http.Handle("/api/people/", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))))
 	http.Handle("/api/people", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))))
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/", fs)
-	http.ListenAndServe(":8080", nil)
+	log.Printf("Starting service on port %d", port)
+	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
