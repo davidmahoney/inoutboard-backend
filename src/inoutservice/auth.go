@@ -15,11 +15,18 @@ import (
 
 var authOptions *AuthorizationOptions
 
+// An error that can be serialized to
+// JSON and returned to the client
 type Error struct {
+	// Error message
 	Message string
-	Path    string
+	// The http path to the api endpoint
+	// to fix the error, eg: /login
+	Path string
 }
 
+// A set of options necessary to find
+// and login to a LDAP server
 type AuthorizationOptions struct {
 	realm          string
 	ldapServer     string
@@ -67,6 +74,7 @@ func LdapAuthFunc(creds *Credentials) bool {
 	}
 }
 
+// Find a person in LDAP
 func FindUser(username string) (Person, error) {
 	var user Person
 	if authOptions == nil {
@@ -118,6 +126,8 @@ func FindUser(username string) (Person, error) {
 	return user, err
 }
 
+// Create a user for a given username. This user must exist
+// in LDAP
 func CreateUser(username string) error {
 	var user Person
 	user, err := FindUser(username)
@@ -169,6 +179,10 @@ func UpdateLdap(options AuthorizationOptions) error {
 	return nil
 }
 
+// Handles cookie-based authentication. An incoming
+// request will have its session ID read from a cookie, and if
+// the session is not valid, returns a JSON-encoded response
+// redirecting to the Login api endpoint.
 func AuthorizationMiddleware(options AuthorizationOptions, next http.Handler) http.Handler {
 	authOptions = &options
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -197,6 +211,8 @@ func AuthorizationMiddleware(options AuthorizationOptions, next http.Handler) ht
 	})
 }
 
+// Removes a session from the database and sets
+// the cookie to be expired.
 func Logout(w http.ResponseWriter, r *http.Request) {
 	log.Println("logged out")
 	var cookie http.Cookie
@@ -216,6 +232,8 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Logged out"))
 }
 
+// Authenticate a user and create a session in the
+// database, returning a cookie with the session ID
 func Login(w http.ResponseWriter, r *http.Request) {
 	log.Println("Creating session")
 	id, err := gorand.UUIDv4()
@@ -266,26 +284,14 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type requestKey int
-
 const requestUsernameKey = 0
 
+// get the username from a context object
 func usernameFromContext(ctx context.Context) string {
 	return ctx.Value(requestUsernameKey).(string)
 }
 
+// return a new context object with the username in it
 func newContextWithUsername(ctx context.Context, username string) context.Context {
 	return context.WithValue(ctx, requestUsernameKey, username)
-}
-
-func unauthorizedHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4050")
-	w.Header().Add("Access-Control-Allow-Methods", "GET, PUT, OPTIONS, HEAD")
-	w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
-	w.Header().Add("Access-Control-Allow-Credentials", "true")
-	if r.Method == "OPTIONS" {
-		return
-	} else {
-		http.Error(w, "", http.StatusUnauthorized)
-	}
 }
