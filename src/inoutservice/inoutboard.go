@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"gopkg.in/gcfg.v1"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -137,9 +138,24 @@ func main() {
 		ldapSearchBase: cfg.Auth.LdapSearchBase,
 	}
 
+	var verbose bool
+	var update bool
+
 	if len(os.Args[1:]) > 0 { // found command-line args
-		if os.Args[1] == "--update-users" { // run ldap update
-			updateLdap(authOptions)
+		for _, p := range os.Args[1:] {
+			switch p {
+			case "--update-users":
+				update = true
+
+			case "--verbose":
+				verbose = true
+			}
+		}
+		if update { // run ldap update
+			if !verbose {
+				log.SetOutput(ioutil.Discard)
+			}
+			UpdateLdap(authOptions)
 			return
 		}
 	}

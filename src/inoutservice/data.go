@@ -265,3 +265,22 @@ func SetPerson(person *Person, username string) error {
 
 	return err
 }
+
+// Updates details for a user. This is meant to be used
+// internally for attributes that are not editable by
+// the user.
+func SetPersonDetails(person *Person) error {
+	stmt, err := conn.Prepare("UPDATE people SET name = ?, department = ?, telephone = ?, mobile = ?, office = ? WHERE username = ?")
+	checkErr(err)
+	res, err := stmt.Exec(person.Name, person.Department, person.Telephone, person.Mobile, person.Office, person.Username)
+	checkErr(err)
+	rows, err := res.RowsAffected()
+	checkErr(err)
+	if rows != 1 {
+		err = fmt.Errorf("Failed to update user %s", person.Username)
+	} else {
+		err = nil
+	}
+
+	return err
+}

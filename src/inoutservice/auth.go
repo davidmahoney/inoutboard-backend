@@ -69,6 +69,9 @@ func LdapAuthFunc(creds *Credentials) bool {
 
 func FindUser(username string) (Person, error) {
 	var user Person
+	if authOptions == nil {
+		log.Panicf("Auth options should not be nil")
+	}
 	hostaddr := fmt.Sprintf("%s:%d", authOptions.ldapServer, authOptions.port)
 	conn, err := ldap.Dial("tcp", hostaddr)
 	if err != nil {
@@ -116,53 +119,53 @@ func FindUser(username string) (Person, error) {
 }
 
 func CreateUser(username string) error {
-	hostaddr := fmt.Sprintf("%s:%d", authOptions.ldapServer, authOptions.port)
-	conn, err := ldap.Dial("tcp", hostaddr)
+	var user Person
+	user, err := FindUser(username)
 	if err != nil {
-		log.Fatal(err)
 		return err
 	}
-
-	defer conn.Close()
-
-	err = conn.StartTLS(&tls.Config{InsecureSkipVerify: true})
-	if err != nil {
-		log.Fatal(err)
-		return err
-	}
-
-	err = conn.Bind(authOptions.realm+"\\"+authOptions.username, authOptions.password)
-	if err != nil {
-		log.Fatal(err)
-		return err
-	}
-
-	searchRequest := ldap.NewSearchRequest(
-		authOptions.ldapSearchBase,
-		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(&(objectClass=organizationalPerson)(sAMAccountName=%s))", username),
-		[]string{"dn", "cn", "title", "department", "telephoneNumber", "mobile", "physicalDeliveryOfficeName"},
-		nil,
-	)
-	res, err := conn.Search(searchRequest)
-	if err != nil || len(res.Entries) != 1 {
-		log.Fatal(err)
-	}
-
-	ldapPerson := res.Entries[0]
 
 	err = AddPerson(
 		username,
-		ldapPerson.GetAttributeValue("cn"),
-		ldapPerson.GetAttributeValue("department"),
-		ldapPerson.GetAttributeValue("telephoneNumber"),
-		ldapPerson.GetAttributeValue("mobile"),
-		ldapPerson.GetAttributeValue("physicalDeliveryOfficeName"),
+		user.Name,
+		user.Department,
+		user.Telephone,
+		user.Mobile,
+		user.Office,
 	)
 	return err
 }
 
-func updateLdap(options AuthorizationOptions) error {
+// Update all the database users with attributes
+// from LDAP. Accordingly, this takes a set of
+// LDAP connection options as a parameter
+func UpdateLdap(options AuthorizationOptions) error {
+	authOptions = &options
+	// get users
+	people, err := GetUsers()
+	if err != nil {
+		log.Fatalf("Failed to get users from the database: %s", err.Error())
+		return err
+	}
+	// for each user, get the LDAP entry
+	for _, user := range people {
+		updated, err := FindUser(user.Username)
+		if err != nil {
+			log.Printf("Failed to get user %s from the LDAP Server: %s", user.Username, err.Error())
+		}
+		// and update the database
+		user.Name = updated.Name
+		user.Department = updated.Department
+		user.Office = updated.Office
+		user.Telephone = updated.Telephone
+		user.Mobile = updated.Mobile
+		if SetPersonDetails(user) != nil {
+			log.Printf("Failed to update user %s: %s", user.Username, err)
+		}
+
+		fmt.Printf(". ")
+	}
+	fmt.Printf("\n")
 	return nil
 }
 
