@@ -98,6 +98,8 @@ func peopleHandler(w http.ResponseWriter, r *http.Request) {
 		peopleInterface := make([]interface{}, 0)
 		people, err := GetUsers()
 		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 		for _, person := range people {
 			fmt.Printf("Person: %s\n", person.Name)
@@ -168,5 +170,9 @@ func main() {
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/", fs)
 	log.Printf("Starting service on port %d", port)
-	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	err = http.ListenAndServeTLS(fmt.Sprintf(":%d", port), "server.crt", "server.key", nil)
+	if err != nil {
+		log.Fatal("ListenAndServe: ", err)
+	}
+
 }

@@ -127,6 +127,9 @@ func GetUsers() ([]*Person, error) {
 		LEFT JOIN people l ON p.last_editor = l.id
 		ORDER BY p.department, p.name`)
 	checkErr(err)
+	if err != nil {
+		return nil, err
+	}
 
 	var id int
 	var username string
@@ -221,8 +224,14 @@ func GetPerson(username string) (*Person, error) {
 	stmt, err := conn.Prepare(`SELECT p.id, p.username, p.name, p.regular_schedule, p.return_time, p.department, p.status, p.notes, p.telephone, p.mobile, p.office, l.name as last_editor, p.last_edit_time
 	FROM people p left join people l on l.id = p.last_editor WHERE p.username = ?`)
 	checkErr(err)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := stmt.Query(username)
 	checkErr(err)
+	if err != nil {
+		return nil, err
+	}
 
 	if rows.Next() {
 		err = rows.Scan(&id, &uname, &name, &regularSchedule, &returnTime, &department, &status, &notes, &telephone, &mobile, &office, &lastEditor, &lastEditTime)
