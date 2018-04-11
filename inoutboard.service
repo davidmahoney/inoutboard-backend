@@ -1,0 +1,12 @@
+[Unit]
+Description=In/Out Board Service
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/inoutservice
+PIDFile=/var/run/inoutboard.pid
+WatchdogSec=30s
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
