@@ -270,7 +270,12 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("created session %s", session)
 
-		cookie := &http.Cookie{Name: "session", Value: session, HttpOnly: false}
+		cookie := &http.Cookie{
+			Name:     "session",
+			Value:    session,
+			HttpOnly: false,
+			Expires:  time.Now().AddDate(1, 0, 0),
+		}
 		http.SetCookie(w, cookie)
 		w.Write([]byte("success"))
 
