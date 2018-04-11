@@ -11,8 +11,6 @@ import (
 var conn *sql.DB
 
 func init() {
-	log.Println("Creating database...")
-	createDb()
 }
 
 func ValidateSession(sessionID string) (string, error) {
@@ -69,9 +67,12 @@ func AddPerson(username string, name string, department string, telephone string
 	return err
 }
 
-func createDb() {
-	db, err := sql.Open("sqlite3", "db.sqlite")
+func createDb(dbPath string) {
+	db, err := sql.Open("sqlite3", dbPath)
 	checkErr(err)
+	if err != nil {
+		log.Fatal("Could not open the database file")
+	}
 	conn = db
 
 	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type = 'table'")
@@ -119,7 +120,7 @@ func createDb() {
 func GetUsers() ([]*Person, error) {
 	log.Print("GetUsers")
 	if conn == nil {
-		createDb()
+		log.Panic("Database was not open")
 	}
 
 	rows, err := conn.Query(`SELECT p.id, p.username, p.name, p.department, p.status, p.notes, p.telephone, p.mobile, p.office, l.name, p.last_edit_time
@@ -197,7 +198,7 @@ func GetUsers() ([]*Person, error) {
 func GetPerson(username string) (*Person, error) {
 	log.Print("GetPerson")
 	if conn == nil {
-		createDb()
+		log.Panic("Database was not open")
 	}
 	var person *Person
 	var id int

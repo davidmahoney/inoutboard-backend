@@ -15,4 +15,9 @@ type Config struct {
 		Realm          string
 		LdapSearchBase string
 	}
+
+	Files struct {
+		StaticFilesPath string
+		DbPath          string
+	}
 }

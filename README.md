@@ -24,9 +24,9 @@ The config holds the login credentials for the LDAP store, and other settings. I
 Environment Variables
 --------------------------
 
--INOUTBOARD\_CONFIG: a path to the actual config file.
+- INOUTBOARD\_CONFIG: a path to the actual config file.
 
--INOUTBOARD\_STATIC: a path to the static files directory.
+- INOUTBOARD\_STATIC: a path to the static files directory.
 
 Installation
 --------------------------
