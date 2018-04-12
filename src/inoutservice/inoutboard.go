@@ -15,14 +15,21 @@ import (
 	"time"
 )
 
+// A status code for a person
+// e.g. In, Out, etc.
 type Status int
 
+// The actual status codes These *should*
+// mirror codes held in the status table in the
+// database. If they don't, bad things probably
+// won't happen.
 const (
 	In = iota
 	Out
 	InField
 )
 
+// A person record
 type Person struct {
 	ID              int
 	Name            string
@@ -40,10 +47,9 @@ type Person struct {
 	LastEditTime    time.Time
 }
 
+// Get or set an individual user
 func handler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4050")
 	w.Header().Add("Access-Control-Allow-Methods", "GET, PUT, OPTIONS, HEAD")
-	w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	username := usernameFromContext(r.Context())
 
 	switch r.Method {
@@ -90,10 +96,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// get a list of people from the database
 func peopleHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4050")
 	w.Header().Add("Access-Control-Allow-Methods", "GET, OPTIONS, HEAD")
-	w.Header().Add("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	switch r.Method {
 	case "OPTIONS":
 		break
@@ -120,6 +125,7 @@ func peopleHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+// get any applicable environment variables (if they're set)
 func getEnvArgs() (string, *string) {
 	var staticFiles *string
 	config := os.Getenv("INOUTBOARD_CONFIG") // use whatever we find in the env
@@ -140,6 +146,7 @@ func getEnvArgs() (string, *string) {
 	return config, staticFiles
 }
 
+// Main function runs at application start
 func main() {
 	// get evnironment variables
 	configPath, staticFilesPath := getEnvArgs()
@@ -186,6 +193,8 @@ func main() {
 	}
 
 	// parse command line args
+	// if the --update-users argument is found
+	// update the users from LDAP and exit
 	var verbose bool
 	var update bool
 
@@ -208,7 +217,7 @@ func main() {
 		}
 	}
 
-	// start the server
+	// configure the server
 	http.Handle("/api/user/", AuthorizationMiddleware(authOptions, AddHeaders(http.StripPrefix("/api/", http.HandlerFunc(handler)))))
 	http.Handle("/api/people/", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))))
 	http.Handle("/api/people", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))))
@@ -243,6 +252,7 @@ func main() {
 		}
 	}()
 
+	// Finally start serving clients
 	err = http.ServeTLS(l, nil, filepath.Join(filepath.Dir(configPath), "server.crt"),
 		filepath.Join(filepath.Dir(configPath), "server.key"))
 	if err != nil {
