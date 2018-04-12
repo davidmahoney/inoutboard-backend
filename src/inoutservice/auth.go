@@ -9,6 +9,7 @@ import (
 	"gopkg.in/ldap.v2"
 	"log"
 	"net/http"
+	"strings"
 	_ "strings"
 	"time"
 )
@@ -62,6 +63,7 @@ func LdapAuthFunc(creds *Credentials) bool {
 
 	err = conn.StartTLS(&tls.Config{InsecureSkipVerify: true})
 	if err != nil {
+		log.Printf("Could not connect to LDAP: %s", err)
 		log.Fatal(err)
 	}
 
@@ -244,6 +246,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	creds := new(Credentials)
 	err = json.NewDecoder(r.Body).Decode(creds)
+	creds.Username = strings.TrimSpace(creds.Username)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -282,10 +285,12 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	} else {
 		log.Printf("login failed")
 		sessionErr := Error{Message: "login failed", Path: "/login"}
-		if err := json.NewEncoder(w).Encode(sessionErr); err != nil {
+		content, err := json.Marshal(sessionErr)
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		http.Error(w, string(content), http.StatusUnauthorized)
 	}
 }
 
