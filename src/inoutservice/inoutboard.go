@@ -31,20 +31,19 @@ const (
 
 // A person record
 type Person struct {
-	ID              int
-	Name            string
-	Username        string
-	ReturnTime      string
-	RegularSchedule string
-	Department      string
-	Status          Status
-	StatusValue     string
-	Remarks         string
-	Mobile          string
-	Telephone       string
-	Office          string
-	LastEditor      string
-	LastEditTime    time.Time
+	ID           int
+	Name         string
+	Username     string
+	Department   string
+	Status       Status
+	StatusValue  string
+	Remarks      string
+	Mobile       string
+	Telephone    string
+	Office       string
+	Title        string
+	LastEditor   string
+	LastEditTime time.Time
 }
 
 // Get or set an individual user

@@ -106,7 +106,7 @@ func createDb(dbPath string) {
 	}
 	log.Print("creating people table")
 	if _, ok := tables["people"]; !ok {
-		_, err = db.Exec("CREATE TABLE people (id INTEGER PRIMARY KEY, username TEXT UNIQUE, name TEXT NOT NULL, department TEXT null, mobile TEXT not null default '', telephone TEXT not null default '', office TEXT not null default '', status int REFERENCES status(id), notes TEXT DEFAULT '', last_editor INTEGER NULL REFERENCES people(id), last_edit_time datetime DEFAULT CURRENT_TIMESTAMP)")
+		_, err = db.Exec("CREATE TABLE people (id INTEGER PRIMARY KEY, username TEXT UNIQUE, name TEXT NOT NULL, department TEXT null, mobile TEXT not null default '', telephone TEXT not null default '', office TEXT not null default '', title TEXT not null default '', status int REFERENCES status(id), notes TEXT DEFAULT '', last_editor INTEGER NULL REFERENCES people(id), last_edit_time datetime DEFAULT CURRENT_TIMESTAMP)")
 		checkErr(err)
 	}
 	if _, ok := tables["sessions"]; !ok {
@@ -123,7 +123,7 @@ func GetUsers() ([]*Person, error) {
 		log.Panic("Database was not open")
 	}
 
-	rows, err := conn.Query(`SELECT p.id, p.username, p.name, p.department, p.status, p.notes, p.telephone, p.mobile, p.office, l.name, p.last_edit_time
+	rows, err := conn.Query(`SELECT p.id, p.username, p.name, p.department, p.status, p.notes, p.telephone, p.mobile, p.office, p.title, l.name, p.last_edit_time
 		FROM people p
 		LEFT JOIN people l ON p.last_editor = l.id
 		ORDER BY p.department, p.name`)
@@ -145,6 +145,7 @@ func GetUsers() ([]*Person, error) {
 	var statusValue string = "Out"
 	var lastEditor sql.NullString
 	var lastEditTime NullTime
+	var title string
 
 	for rows.Next() {
 		err = rows.Scan(
@@ -157,6 +158,7 @@ func GetUsers() ([]*Person, error) {
 			&telephone,
 			&mobile,
 			&office,
+			&title,
 			&lastEditor,
 			&lastEditTime)
 		switch status {
@@ -179,6 +181,7 @@ func GetUsers() ([]*Person, error) {
 			Telephone:   telephone,
 			Mobile:      mobile,
 			Office:      office,
+			Title:       title,
 			LastEditor:  "",
 		}
 		if lastEditor.Valid {
@@ -211,10 +214,11 @@ func GetPerson(username string) (*Person, error) {
 	var office sql.NullString
 	var telephone sql.NullString
 	var mobile sql.NullString
+	var title string
 	var lastEditor sql.NullString
 	var lastEditTime NullTime
 
-	stmt, err := conn.Prepare(`SELECT p.id, p.username, p.name, p.department, p.status, p.notes, p.telephone, p.mobile, p.office, l.name as last_editor, p.last_edit_time
+	stmt, err := conn.Prepare(`SELECT p.id, p.username, p.name, p.department, p.status, p.notes, p.telephone, p.mobile, p.office, p.title, l.name as last_editor, p.last_edit_time
 	FROM people p left join people l on l.id = p.last_editor WHERE p.username = ?`)
 	checkErr(err)
 	if err != nil {
@@ -227,7 +231,7 @@ func GetPerson(username string) (*Person, error) {
 	}
 
 	if rows.Next() {
-		err = rows.Scan(&id, &uname, &name, &department, &status, &notes, &telephone, &mobile, &office, &lastEditor, &lastEditTime)
+		err = rows.Scan(&id, &uname, &name, &department, &status, &notes, &telephone, &mobile, &office, &title, &lastEditor, &lastEditTime)
 		checkErr(err)
 		switch status {
 		case In:
@@ -244,6 +248,7 @@ func GetPerson(username string) (*Person, error) {
 			Department:  department,
 			Status:      status,
 			StatusValue: statusValue,
+			Title:       title,
 			Remarks:     notes,
 		}
 		if lastEditor.Valid {
