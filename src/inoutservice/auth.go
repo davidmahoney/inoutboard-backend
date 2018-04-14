@@ -282,6 +282,9 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	} else {
 		log.Printf("login failed")
 		sessionErr := Error{Message: "login failed", Path: "/login"}
+
+		content, _ := json.Marshal(sessionErr)
+		http.Error(w, string(content), http.StatusUnauthorized)
 		if err := json.NewEncoder(w).Encode(sessionErr); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
