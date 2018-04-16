@@ -72,7 +72,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	case "PUT":
-		log.Info("Saving user...")
+		log.Debugf("Saving user...")
 		person := new(Person)
 		err := json.NewDecoder(r.Body).Decode(person)
 
@@ -114,7 +114,7 @@ func peopleHandler(w http.ResponseWriter, r *http.Request) {
 			log.Debugf("Person: %s", person.Name)
 			peopleInterface = append(peopleInterface, person)
 		}
-		log.Infof("GetUsers returned %d people", len(peopleInterface))
+		log.Debugf("GetUsers returned %d people", len(peopleInterface))
 
 		if err := json.NewEncoder(w).Encode(peopleInterface); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -261,7 +261,7 @@ func main() {
 	http.Handle("/api/people/", l.Handler(AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))), "people"))
 	//http.Handle("/api/people", l.Handler(AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))), "people"))
 	fs := http.FileServer(http.Dir(cfg.Files.StaticFilesPath))
-	http.Handle("/", l.Handler(fs, "staticfiles"))
+	http.Handle("/", fs)
 	log.Printf("Starting service on port %d", port)
 	socket, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
