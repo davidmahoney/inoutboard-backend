@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	_ "github.com/mattn/go-sqlite3"
-	"log"
 )
 
 var conn *sql.DB
@@ -51,8 +51,8 @@ func RemoveSession(sessionID string) error {
 
 func checkErr(err error) {
 	if err != nil {
-		fmt.Printf(err.Error())
-		fmt.Println(" Noooooo!\n")
+		log.Error(err.Error())
+		log.Error(" Noooooo!\n")
 	}
 }
 
@@ -63,7 +63,7 @@ func AddPerson(username string, name string, department string, telephone string
 	}
 
 	_, err = stmt.Exec(username, name, Out, department, mobile, telephone, office)
-	log.Printf("Added %s to the db", username)
+	log.Info("Added %s to the db", username)
 	return err
 }
 
@@ -82,7 +82,7 @@ func createDb(dbPath string) {
 	for rows.Next() {
 		err = rows.Scan(&table)
 		checkErr(err)
-		log.Printf("found table %s", table)
+		log.Infof("found table %s", table)
 		tables[table] = table
 	}
 
@@ -192,7 +192,7 @@ func GetUsers() ([]*Person, error) {
 		}
 		people = append(people, p)
 	}
-	fmt.Printf("Got %d people from the db\n", len(people))
+	log.Debugf("Got %d people from the db\n", len(people))
 	rows.Close()
 
 	return people, nil
