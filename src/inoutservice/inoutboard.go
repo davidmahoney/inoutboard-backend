@@ -4,10 +4,11 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
+	"github.com/bakins/logrus-middleware"
 	"github.com/coreos/go-systemd/daemon"
 	"gopkg.in/gcfg.v1"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -31,20 +32,19 @@ const (
 
 // A person record
 type Person struct {
-	ID              int
-	Name            string
-	Username        string
-	ReturnTime      string
-	RegularSchedule string
-	Department      string
-	Status          Status
-	StatusValue     string
-	Remarks         string
-	Mobile          string
-	Telephone       string
-	Office          string
-	LastEditor      string
-	LastEditTime    time.Time
+	ID           int
+	Name         string
+	Username     string
+	Department   string
+	Status       Status
+	StatusValue  string
+	Remarks      string
+	Mobile       string
+	Telephone    string
+	Office       string
+	Title        string
+	LastEditor   string
+	LastEditTime time.Time
 }
 
 // Get or set an individual user
@@ -72,12 +72,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	case "PUT":
-		fmt.Printf("Saving user...\n")
+		log.Info("Saving user...")
 		person := new(Person)
 		err := json.NewDecoder(r.Body).Decode(person)
 
 		if err != nil {
-			fmt.Printf(err.Error())
+			log.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		err = SetPerson(person, username)
@@ -111,10 +111,10 @@ func peopleHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, person := range people {
-			fmt.Printf("Person: %s\n", person.Name)
+			log.Debugf("Person: %s", person.Name)
 			peopleInterface = append(peopleInterface, person)
 		}
-		fmt.Printf("GetUsers returned %d people\n", len(peopleInterface))
+		log.Infof("GetUsers returned %d people", len(peopleInterface))
 
 		if err := json.NewEncoder(w).Encode(peopleInterface); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -144,6 +144,35 @@ func getEnvArgs() (string, *string) {
 		staticFiles = &st
 	}
 	return config, staticFiles
+}
+
+func init() {
+	// set up logging
+	log.SetOutput(os.Stdout)
+	log.SetFormatter(&log.JSONFormatter{})
+	switch os.Getenv("INOUTBOARD_DEBUG") {
+	case "debug":
+		{
+			log.SetLevel(log.DebugLevel)
+			log.SetFormatter(&log.TextFormatter{})
+		}
+	case "info":
+		{
+			log.SetLevel(log.InfoLevel)
+		}
+	case "warn":
+		{
+			log.SetLevel(log.WarnLevel)
+		}
+	case "error":
+		{
+			log.SetLevel(log.ErrorLevel)
+		}
+	default:
+		{
+			log.SetLevel(log.WarnLevel)
+		}
+	}
 }
 
 // Main function runs at application start
@@ -218,13 +247,23 @@ func main() {
 	}
 
 	// configure the server
-	http.Handle("/api/user/", AuthorizationMiddleware(authOptions, AddHeaders(http.StripPrefix("/api/", http.HandlerFunc(handler)))))
-	http.Handle("/api/people/", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))))
-	http.Handle("/api/people", AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))))
+	logger := log.New()
+	logger.SetLevel(log.StandardLogger().Level)
+	logger.Out = log.StandardLogger().Out
+	logger.Formatter = log.StandardLogger().Formatter
+
+	l := logrusmiddleware.Middleware{
+		Name:   "inoutboard",
+		Logger: logger,
+	}
+
+	http.Handle("/api/user/", l.Handler(AuthorizationMiddleware(authOptions, AddHeaders(http.StripPrefix("/api/", http.HandlerFunc(handler)))), "user"))
+	http.Handle("/api/people/", l.Handler(AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))), "people"))
+	//http.Handle("/api/people", l.Handler(AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))), "people"))
 	fs := http.FileServer(http.Dir(cfg.Files.StaticFilesPath))
-	http.Handle("/", fs)
+	http.Handle("/", l.Handler(fs, "staticfiles"))
 	log.Printf("Starting service on port %d", port)
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	socket, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -253,10 +292,9 @@ func main() {
 	}()
 
 	// Finally start serving clients
-	err = http.ServeTLS(l, nil, filepath.Join(filepath.Dir(configPath), "server.crt"),
+	err = http.ServeTLS(socket, nil, filepath.Join(filepath.Dir(configPath), "server.crt"),
 		filepath.Join(filepath.Dir(configPath), "server.key"))
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
-
 }

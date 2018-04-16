@@ -28,6 +28,8 @@ Environment Variables
 
 - INOUTBOARD\_STATIC: a path to the static files directory.
 
+- INOUTBOARD\_DEBUG: the log verbosity. Recognized values are debug, info, warn, and error. While the debug log level uses a text formatter, higher log levels use JSON.
+
 Installation
 --------------------------
 
