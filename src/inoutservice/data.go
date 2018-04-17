@@ -10,6 +10,8 @@ import (
 
 var conn *sql.DB
 
+var statusCodes map[int]Status
+
 func init() {
 }
 
@@ -62,7 +64,8 @@ func AddPerson(username string, name string, department string, telephone string
 		log.Fatal(err)
 	}
 
-	_, err = stmt.Exec(username, name, Out, department, mobile, telephone, office)
+	// there has to be a status code 0 in the db or this will fail
+	_, err = stmt.Exec(username, name, 0, department, mobile, telephone, office)
 	log.Info("Added %s to the db", username)
 	return err
 }
@@ -137,15 +140,18 @@ func GetUsers() ([]*Person, error) {
 	var name string
 	var department sql.NullString
 	var notes string
-	var status Status
+	var status int
 	var telephone string
 	var mobile string
 	var office string
 	var people []*Person
-	var statusValue string = "Out"
 	var lastEditor sql.NullString
 	var lastEditTime NullTime
 	var title string
+	statuses, err := StatusCodes()
+	if err != nil {
+		log.Fatalf("Failed to get status codes from the database: %s", err)
+	}
 
 	for rows.Next() {
 		err = rows.Scan(
@@ -161,29 +167,26 @@ func GetUsers() ([]*Person, error) {
 			&title,
 			&lastEditor,
 			&lastEditTime)
-		switch status {
-		case In:
-			statusValue = "In"
-		case Out:
-			statusValue = "Out"
-		case InField:
-			statusValue = "In Field"
-		}
 		checkErr(err)
-		p := &Person{
-			ID:          id,
-			Name:        name,
-			Username:    username,
-			Department:  department.String,
-			Status:      status,
-			StatusValue: statusValue,
-			Remarks:     notes,
-			Telephone:   telephone,
-			Mobile:      mobile,
-			Office:      office,
-			Title:       title,
-			LastEditor:  "",
+		if err != nil {
+			return nil, err
 		}
+		p := &Person{
+			ID:         id,
+			Name:       name,
+			Username:   username,
+			Department: department.String,
+			Status:     statuses[status],
+			Remarks:    notes,
+			Telephone:  telephone,
+			Mobile:     mobile,
+			Office:     office,
+			Title:      title,
+			LastEditor: "",
+		}
+
+		p.Status = statuses[status]
+
 		if lastEditor.Valid {
 			p.LastEditor = lastEditor.String
 		}
@@ -207,10 +210,9 @@ func GetPerson(username string) (*Person, error) {
 	var id int
 	var uname string
 	var name string
-	var status Status
+	var status int
 	var notes string
 	var department string
-	var statusValue string = "Out"
 	var office sql.NullString
 	var telephone sql.NullString
 	var mobile sql.NullString
@@ -229,28 +231,27 @@ func GetPerson(username string) (*Person, error) {
 	if err != nil {
 		return nil, err
 	}
+	statuses, err := StatusCodes()
+	if err != nil {
+		log.Fatalf("Could not get status codes from the database: %s", err)
+	}
 
 	if rows.Next() {
 		err = rows.Scan(&id, &uname, &name, &department, &status, &notes, &telephone, &mobile, &office, &title, &lastEditor, &lastEditTime)
 		checkErr(err)
-		switch status {
-		case In:
-			statusValue = "In"
-		case Out:
-			statusValue = "Out"
-		case InField:
-			statusValue = "In Field"
+		if err != nil {
+			return nil, err
 		}
 		person = &Person{
-			ID:          id,
-			Name:        name,
-			Username:    username,
-			Department:  department,
-			Status:      status,
-			StatusValue: statusValue,
-			Title:       title,
-			Remarks:     notes,
+			ID:         id,
+			Name:       name,
+			Username:   username,
+			Department: department,
+			Title:      title,
+			Remarks:    notes,
 		}
+		person.Status = statuses[status]
+
 		if lastEditor.Valid {
 			person.LastEditor = lastEditor.String
 		}
@@ -278,7 +279,7 @@ func GetPerson(username string) (*Person, error) {
 func SetPerson(person *Person, username string) error {
 	stmt, err := conn.Prepare("UPDATE people SET status = ?, notes = ?, last_editor = (select id from people where username = ?), last_edit_time = current_timestamp WHERE username = ?")
 	checkErr(err)
-	res, err := stmt.Exec(person.Status, person.Remarks, username, person.Username)
+	res, err := stmt.Exec(person.Status.Code, person.Remarks, username, person.Username)
 	checkErr(err)
 
 	rows, err := res.RowsAffected()
@@ -309,4 +310,37 @@ func SetPersonDetails(person *Person) error {
 	}
 
 	return err
+}
+
+func StatusCodes() (map[int]Status, error) {
+	if statusCodes == nil {
+		statusCodes = make(map[int]Status)
+	}
+	if len(statusCodes) > 0 {
+		return statusCodes, nil
+	}
+	stmt, err := conn.Prepare("SELECT * FROM status")
+	checkErr(err)
+	if err != nil {
+		statusCodes = make(map[int]Status)
+		return statusCodes, err
+	}
+	rows, err := stmt.Query()
+	checkErr(err)
+	if err != nil {
+		statusCodes = make(map[int]Status)
+		return statusCodes, err
+	}
+
+	var status Status
+	for rows.Next() {
+		status = Status{}
+		err = rows.Scan(&status.Code, &status.Value)
+		statusCodes[status.Code] = status
+		if err != nil {
+			statusCodes = make(map[int]Status)
+			return statusCodes, err
+		}
+	}
+	return statusCodes, nil
 }

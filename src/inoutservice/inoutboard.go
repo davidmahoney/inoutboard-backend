@@ -16,10 +16,6 @@ import (
 	"time"
 )
 
-// A status code for a person
-// e.g. In, Out, etc.
-type Status int
-
 // The actual status codes These *should*
 // mirror codes held in the status table in the
 // database. If they don't, bad things probably
@@ -30,6 +26,13 @@ const (
 	InField
 )
 
+// A status code for a person
+// e.g. In, Out, etc.
+type Status struct {
+	Code  int
+	Value string
+}
+
 // A person record
 type Person struct {
 	ID           int
@@ -37,7 +40,6 @@ type Person struct {
 	Username     string
 	Department   string
 	Status       Status
-	StatusValue  string
 	Remarks      string
 	Mobile       string
 	Telephone    string
@@ -121,6 +123,22 @@ func peopleHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	default:
 		http.Error(w, "", http.StatusMethodNotAllowed)
+	}
+	return
+}
+
+// Get a list of available status codes from the database
+func statusHandler(w http.ResponseWriter, r *http.Request) {
+	statusInterface := make([]interface{}, 0)
+	statuses, err := StatusCodes()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	for _, status := range statuses {
+		statusInterface = append(statusInterface, status)
+	}
+	if err := json.NewEncoder(w).Encode(statusInterface); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	return
 }
@@ -259,6 +277,7 @@ func main() {
 
 	http.Handle("/api/user/", l.Handler(AuthorizationMiddleware(authOptions, AddHeaders(http.StripPrefix("/api/", http.HandlerFunc(handler)))), "user"))
 	http.Handle("/api/people/", l.Handler(AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))), "people"))
+	http.Handle("/api/statuscodes", l.Handler(AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(statusHandler))), "statuses"))
 	//http.Handle("/api/people", l.Handler(AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))), "people"))
 	fs := http.FileServer(http.Dir(cfg.Files.StaticFilesPath))
 	http.Handle("/", fs)
