@@ -124,6 +124,7 @@ func FindUser(username string) (Person, error) {
 		Telephone:  ldapPerson.GetAttributeValue("telephoneNumber"),
 		Mobile:     ldapPerson.GetAttributeValue("mobile"),
 		Office:     ldapPerson.GetAttributeValue("physicalDeliveryOfficeName"),
+		Title:      ldapPerson.GetAttributeValue("title"),
 	}
 	return user, err
 }
@@ -171,6 +172,15 @@ func UpdateLdap(options AuthorizationOptions) error {
 		user.Office = updated.Office
 		user.Telephone = updated.Telephone
 		user.Mobile = updated.Mobile
+		user.Title = updated.Title
+		log.Debugf("updating %s with name = %s, department = %s, office = %s telephone = %s, mobile = %s, title = %s",
+			user.Username,
+			user.Name,
+			user.Department,
+			user.Office,
+			user.Telephone,
+			user.Mobile,
+			user.Title)
 		if SetPersonDetails(user) != nil {
 			log.Printf("Failed to update user %s: %s", user.Username, err)
 		}
