@@ -296,9 +296,9 @@ func SetPerson(person *Person, username string) error {
 // internally for attributes that are not editable by
 // the user.
 func SetPersonDetails(person *Person) error {
-	stmt, err := conn.Prepare("UPDATE people SET name = ?, department = ?, telephone = ?, mobile = ?, office = ? WHERE username = ?")
+	stmt, err := conn.Prepare("UPDATE people SET name = ?, department = ?, telephone = ?, mobile = ?, office = ?, title = ? WHERE username = ?")
 	checkErr(err)
-	res, err := stmt.Exec(person.Name, person.Department, person.Telephone, person.Mobile, person.Office, person.Username)
+	res, err := stmt.Exec(person.Name, person.Department, person.Telephone, person.Mobile, person.Office, person.Title, person.Username)
 	checkErr(err)
 	rows, err := res.RowsAffected()
 	checkErr(err)
