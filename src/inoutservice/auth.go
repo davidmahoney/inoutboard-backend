@@ -145,6 +145,7 @@ func CreateUser(username string) error {
 		user.Telephone,
 		user.Mobile,
 		user.Office,
+		user.Title,
 	)
 	return err
 }
