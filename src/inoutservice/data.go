@@ -104,7 +104,7 @@ func createDb(dbPath string) {
 		checkErr(err)
 		res, err = stmt.Exec("Out")
 		checkErr(err)
-		res, err = stmt.Exec("InField")
+		res, err = stmt.Exec("In Field")
 		checkErr(err)
 	}
 	log.Print("creating people table")
