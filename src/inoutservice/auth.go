@@ -67,13 +67,63 @@ func LdapAuthFunc(creds *Credentials) bool {
 		log.Fatal(err)
 	}
 
-	err = conn.Bind(authOptions.realm+"\\"+creds.Username, creds.Password)
+	dn, err := SanitizeDN(creds.Username)
+	if err != nil {
+		log.Infof("User %s attempted authentication with an invalid username", creds.Username)
+		return false
+	}
+
+	if len(creds.Password) == 0 {
+		return false
+	}
+
+	err = conn.Bind(authOptions.realm+"\\"+dn, creds.Password)
 	if err == nil {
+		log.Debugf("User %s logged in", creds.Username)
 		return true
 	} else {
 		log.Printf("LDAP: %s", err.Error())
 		return false
 	}
+}
+
+// Escape a string for use in a DN
+// This follows the rules for allowed characters
+// in a samaccountname field in Active Directory
+// Other LDAP implementations may differ
+func SanitizeDN(dn string) (string, error) {
+	var newdn string = dn
+	forbiddenChars := "\"[]:;|=+*?<>/\\,"
+
+	// no empty distinguished names allowed
+	if len(dn) == 0 {
+		return "", fmt.Errorf("forbidden")
+	}
+
+	if strings.LastIndexAny(dn, forbiddenChars) >= 0 {
+		return "", fmt.Errorf("forbidden")
+	}
+	// characters with values < 32 are also forbidden
+	for _, c := range dn {
+		if int(c) < 32 {
+			return "", fmt.Errorf("forbidden")
+		}
+	}
+	// escape a leading space or # character
+	if len(dn) > 0 && (dn[0] == ' ' || dn[0] == '#') {
+		newdn = "\\" + dn
+	}
+
+	// escape \ * ( ) and NUL characters
+	replacer := strings.NewReplacer("\\", "\\5c", "*", "\\2a", "(", "\\28", ")", "\\29", "\u0000", "\\00")
+	newdn = replacer.Replace(newdn)
+	// escape a trailing space
+	if dn[len(dn)-1] == ' ' {
+		newdn = strings.TrimSpace(newdn)
+		newdn += "\\ "
+	}
+	log.Debugf("Replaced username \"%s\" with \"%s\"", dn, newdn)
+	return newdn, nil
 }
 
 // Find a person in LDAP
@@ -103,10 +153,15 @@ func FindUser(username string) (Person, error) {
 		return user, err
 	}
 
+	dn, err := SanitizeDN(username)
+	if err != nil {
+		return user, fmt.Errorf("bad username")
+	}
+
 	searchRequest := ldap.NewSearchRequest(
 		authOptions.ldapSearchBase,
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(&(objectClass=organizationalPerson)(sAMAccountName=%s))", username),
+		fmt.Sprintf("(&(objectClass=organizationalPerson)(sAMAccountName=%s))", dn),
 		[]string{"dn", "cn", "title", "department", "telephoneNumber", "mobile", "physicalDeliveryOfficeName"},
 		nil,
 	)
