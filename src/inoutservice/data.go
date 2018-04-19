@@ -58,7 +58,7 @@ func checkErr(err error) {
 	}
 }
 
-func AddPerson(username string, name string, department string, telephone string, mobile string, office string, title string) error {
+func AddPerson(username string, name string, department string, telephone string, mobile string, office string, title string) (*Person, error) {
 	stmt, err := conn.Prepare("INSERT INTO people (username, name, status, department, mobile, telephone, office, title) VALUES (?,?,?,?,?,?,?,?)")
 	if err != nil {
 		log.Fatal(err)
@@ -66,8 +66,13 @@ func AddPerson(username string, name string, department string, telephone string
 
 	// there has to be a status code 0 in the db or this will fail
 	_, err = stmt.Exec(username, name, 0, department, mobile, telephone, office, title)
-	log.Info("Added %s to the db", username)
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	person, err := GetPerson(username)
+	log.Infof("Added %s to the db", username)
+	return person, err
 }
 
 func createDb(dbPath string) {

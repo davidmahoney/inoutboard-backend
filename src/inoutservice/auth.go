@@ -77,7 +77,10 @@ func LdapAuthFunc(creds *Credentials) bool {
 		return false
 	}
 
-	err = conn.Bind(authOptions.realm+"\\"+dn, creds.Password)
+	if strings.LastIndexAny(dn, "@") < 0 { // not an email address
+		dn = authOptions.realm + "\\" + dn
+	}
+	err = conn.Bind(dn, creds.Password)
 	if err == nil {
 		log.Debugf("User %s logged in", creds.Username)
 		return true
@@ -158,11 +161,18 @@ func FindUser(username string) (Person, error) {
 		return user, fmt.Errorf("bad username")
 	}
 
+	var queryString string
+	if strings.LastIndexAny(dn, "@") > 0 {
+		queryString = fmt.Sprintf("(&(objectClass=organizationalPerson)(userPrincipalName=%s))", dn)
+	} else {
+		queryString = fmt.Sprintf("(&(objectClass=organizationalPerson)(sAMAccountName=%s))", dn)
+	}
+
 	searchRequest := ldap.NewSearchRequest(
 		authOptions.ldapSearchBase,
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(&(objectClass=organizationalPerson)(sAMAccountName=%s))", dn),
-		[]string{"dn", "cn", "title", "department", "telephoneNumber", "mobile", "physicalDeliveryOfficeName"},
+		queryString,
+		[]string{"userPrincipalName", "cn", "title", "department", "telephoneNumber", "mobile", "physicalDeliveryOfficeName"},
 		nil,
 	)
 	res, err := conn.Search(searchRequest)
@@ -173,7 +183,7 @@ func FindUser(username string) (Person, error) {
 	ldapPerson := res.Entries[0]
 
 	user = Person{
-		Username:   username,
+		Username:   ldapPerson.GetAttributeValue("userPrincipalName"),
 		Name:       ldapPerson.GetAttributeValue("cn"),
 		Department: ldapPerson.GetAttributeValue("department"),
 		Telephone:  ldapPerson.GetAttributeValue("telephoneNumber"),
@@ -186,15 +196,20 @@ func FindUser(username string) (Person, error) {
 
 // Create a user for a given username. This user must exist
 // in LDAP
-func CreateUser(username string) error {
-	var user Person
-	user, err := FindUser(username)
+func CreateUser(username string) (*Person, error) {
+	var err error
+	var user *Person = new(Person)
+	*user, err = FindUser(username)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = AddPerson(
-		username,
+	if user, err = GetPerson(user.Username); user != nil {
+		return user, err
+	}
+
+	user, err = AddPerson(
+		user.Username,
 		user.Name,
 		user.Department,
 		user.Telephone,
@@ -202,7 +217,7 @@ func CreateUser(username string) error {
 		user.Office,
 		user.Title,
 	)
-	return err
+	return user, err
 }
 
 // Update all the database users with attributes
@@ -323,13 +338,9 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 		if person, err = GetPerson(creds.Username); err != nil {
 			// create user from ldap store
-			if err = CreateUser(creds.Username); err != nil {
+			person, err = CreateUser(creds.Username)
+			if err != nil {
 				log.Fatalf("Failed to create user: %s", err.Error())
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-			log.Printf("Created user")
-			if person, err = GetPerson(creds.Username); err != nil {
-				log.Fatal(err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		}
