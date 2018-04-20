@@ -6,13 +6,16 @@ import (
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	_ "github.com/mattn/go-sqlite3"
+	"sync"
 )
 
 var conn *sql.DB
 
 var statusCodes map[int]Status
+var mutex *sync.Mutex
 
 func init() {
+	mutex = &sync.Mutex{}
 }
 
 func ValidateSession(sessionID string) (string, error) {
@@ -321,19 +324,23 @@ func StatusCodes() (map[int]Status, error) {
 	if statusCodes == nil {
 		statusCodes = make(map[int]Status)
 	}
+	mutex.Lock()
 	if len(statusCodes) > 0 {
+		mutex.Unlock()
 		return statusCodes, nil
 	}
 	stmt, err := conn.Prepare("SELECT * FROM status")
 	checkErr(err)
 	if err != nil {
 		statusCodes = make(map[int]Status)
+		mutex.Unlock()
 		return statusCodes, err
 	}
 	rows, err := stmt.Query()
 	checkErr(err)
 	if err != nil {
 		statusCodes = make(map[int]Status)
+		mutex.Unlock()
 		return statusCodes, err
 	}
 
@@ -344,8 +351,10 @@ func StatusCodes() (map[int]Status, error) {
 		statusCodes[status.Code] = status
 		if err != nil {
 			statusCodes = make(map[int]Status)
+			mutex.Unlock()
 			return statusCodes, err
 		}
 	}
+	mutex.Unlock()
 	return statusCodes, nil
 }
