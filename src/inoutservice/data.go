@@ -20,8 +20,10 @@ func init() {
 
 func ValidateSession(sessionID string) (string, error) {
 	stmt, err := conn.Prepare("SELECT username FROM sessions JOIN people ON (person_id = people.id) WHERE sessions.id = ?")
+	defer stmt.Close()
 	checkErr(err)
 	res, err := stmt.Query(sessionID)
+	defer res.Close()
 	checkErr(err)
 	var username string
 	rows := 0
@@ -40,6 +42,7 @@ func ValidateSession(sessionID string) (string, error) {
 
 func CreateSession(sessionID string, userID int) error {
 	stmt, err := conn.Prepare("INSERT INTO sessions (id, person_id) VALUES (?, ?)")
+	defer stmt.Close()
 	checkErr(err)
 	stmt.Exec(sessionID, userID)
 	checkErr(err)
@@ -48,6 +51,7 @@ func CreateSession(sessionID string, userID int) error {
 
 func RemoveSession(sessionID string) error {
 	stmt, err := conn.Prepare("DELETE FROM sessions WHERE id = ?")
+	defer stmt.Close()
 	checkErr(err)
 	_, err = stmt.Exec(sessionID)
 	checkErr(err)
@@ -63,6 +67,7 @@ func checkErr(err error) {
 
 func AddPerson(username string, name string, department string, telephone string, mobile string, office string, title string) (*Person, error) {
 	stmt, err := conn.Prepare("INSERT INTO people (username, name, status, department, mobile, telephone, office, title) VALUES (?,?,?,?,?,?,?,?)")
+	defer stmt.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -87,6 +92,7 @@ func createDb(dbPath string) {
 	conn = db
 
 	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type = 'table'")
+	defer rows.Close()
 	tables := make(map[string]string)
 	var table string
 	checkErr(err)
@@ -123,6 +129,7 @@ func createDb(dbPath string) {
 	if _, ok := tables["sessions"]; !ok {
 		log.Print("creating sessions table")
 		stmt, err := db.Prepare("CREATE TABLE sessions (id text PRIMARY KEY, person_id INTEGER REFERENCES people(id), create_time DATETIME DEFAULT CURRENT_TIMESTAMP)")
+		defer stmt.Close()
 		_, err = stmt.Exec()
 		checkErr(err)
 	}
@@ -138,6 +145,7 @@ func GetUsers() ([]*Person, error) {
 		FROM people p
 		LEFT JOIN people l ON p.last_editor = l.id
 		ORDER BY p.department, p.name`)
+	defer rows.Close()
 	checkErr(err)
 	if err != nil {
 		return nil, err
@@ -230,11 +238,13 @@ func GetPerson(username string) (*Person, error) {
 
 	stmt, err := conn.Prepare(`SELECT p.id, p.username, p.name, p.department, p.status, p.notes, p.telephone, p.mobile, p.office, p.title, l.name as last_editor, p.last_edit_time
 	FROM people p left join people l on l.id = p.last_editor WHERE p.username = ?`)
+	defer stmt.Close()
 	checkErr(err)
 	if err != nil {
 		return nil, err
 	}
 	rows, err := stmt.Query(username)
+	defer rows.Close()
 	checkErr(err)
 	if err != nil {
 		return nil, err
@@ -286,6 +296,7 @@ func GetPerson(username string) (*Person, error) {
 
 func SetPerson(person *Person, username string) error {
 	stmt, err := conn.Prepare("UPDATE people SET status = ?, notes = ?, last_editor = (select id from people where username = ?), last_edit_time = current_timestamp WHERE username = ?")
+	defer stmt.Close()
 	checkErr(err)
 	res, err := stmt.Exec(person.Status.Code, person.Remarks, username, person.Username)
 	checkErr(err)
@@ -306,6 +317,7 @@ func SetPerson(person *Person, username string) error {
 // the user.
 func SetPersonDetails(person *Person) error {
 	stmt, err := conn.Prepare("UPDATE people SET name = ?, department = ?, telephone = ?, mobile = ?, office = ?, title = ? WHERE username = ?")
+	defer stmt.Close()
 	checkErr(err)
 	res, err := stmt.Exec(person.Name, person.Department, person.Telephone, person.Mobile, person.Office, person.Title, person.Username)
 	checkErr(err)
@@ -330,6 +342,7 @@ func StatusCodes() (map[int]Status, error) {
 		return statusCodes, nil
 	}
 	stmt, err := conn.Prepare("SELECT * FROM status")
+	defer stmt.Close()
 	checkErr(err)
 	if err != nil {
 		statusCodes = make(map[int]Status)
@@ -337,6 +350,7 @@ func StatusCodes() (map[int]Status, error) {
 		return statusCodes, err
 	}
 	rows, err := stmt.Query()
+	defer rows.Close()
 	checkErr(err)
 	if err != nil {
 		statusCodes = make(map[int]Status)
