@@ -204,8 +204,8 @@ func CreateUser(username string) (*Person, error) {
 		return nil, err
 	}
 
-	if user, err = GetPerson(user.Username); user != nil {
-		return user, err
+	if sqlUser, err := GetPerson(user.Username); sqlUser != nil {
+		return sqlUser, err
 	}
 
 	user, err = AddPerson(
