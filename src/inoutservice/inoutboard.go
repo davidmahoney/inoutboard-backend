@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -48,6 +49,9 @@ type Person struct {
 	LastEditor   string
 	LastEditTime time.Time
 }
+
+// cached Config
+var _config *Config
 
 // Get or set an individual user
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -148,15 +152,19 @@ func redirectToHttps(w http.ResponseWriter, r *http.Request) {
 	var redirectUri string
 	httpsPort := getEnvArgs().Net.Port
 	if httpsPort != 443 {
-		redirectUri = "https://" + r.Host + ":" + string(httpsPort) + r.RequestURI
+		redirectUri = "https://" + r.Host + ":" + strconv.Itoa(httpsPort) + r.RequestURI
 	} else {
 		redirectUri = "https://" + r.Host + r.RequestURI
 	}
+	log.Debug(redirectUri)
 	http.Redirect(w, r, redirectUri, http.StatusMovedPermanently)
 }
 
 // get any applicable environment variables (if they're set)
 func getEnvArgs() Config {
+	if _config != nil {
+		return *_config
+	}
 	var staticFiles *string
 	config := os.Getenv("INOUTBOARD_CONFIG") // use whatever we find in the env
 	if config == "" {                        // or use the file in /etc if it exists
@@ -205,6 +213,7 @@ func getEnvArgs() Config {
 		cfg.Files.TLSKey = filepath.Join(filepath.Dir(config), "server.key")
 	}
 
+	_config = &cfg
 	return cfg
 }
 
