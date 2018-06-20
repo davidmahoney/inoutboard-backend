@@ -19,5 +19,7 @@ type Config struct {
 	Files struct {
 		StaticFilesPath string
 		DbPath          string
+		TLSCert         string
+		TLSKey          string
 	}
 }

@@ -143,8 +143,20 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+// unconditionally redirect to https
+func redirectToHttps(w http.ResponseWriter, r *http.Request) {
+	var redirectUri string
+	httpsPort := getEnvArgs().Net.Port
+	if httpsPort != 443 {
+		redirectUri = "https://" + r.Host + ":" + string(httpsPort) + r.RequestURI
+	} else {
+		redirectUri = "https://" + r.Host + r.RequestURI
+	}
+	http.Redirect(w, r, redirectUri, http.StatusMovedPermanently)
+}
+
 // get any applicable environment variables (if they're set)
-func getEnvArgs() (string, *string) {
+func getEnvArgs() Config {
 	var staticFiles *string
 	config := os.Getenv("INOUTBOARD_CONFIG") // use whatever we find in the env
 	if config == "" {                        // or use the file in /etc if it exists
@@ -161,7 +173,39 @@ func getEnvArgs() (string, *string) {
 		st := os.Getenv("INOUTBOARD_STATIC")
 		staticFiles = &st
 	}
-	return config, staticFiles
+	log.Printf("Using configuration file %s", config)
+	var cfg Config
+	err := gcfg.ReadFileInto(&cfg, config)
+	if err != nil {
+		log.Printf(err.Error())
+		panic("could not open config.ini")
+	}
+
+	if cfg.Files.StaticFilesPath == "" {
+		if staticFiles != nil {
+			cfg.Files.StaticFilesPath = *staticFiles
+		} else {
+			cfg.Files.StaticFilesPath = "static"
+		}
+	}
+	log.Printf("Static files: %s", cfg.Files.StaticFilesPath)
+
+	log.Printf("config ldapServer: %s", cfg.Auth.LdapServer)
+	if cfg.Files.DbPath != "" {
+		log.Printf("using db: %s", cfg.Files.DbPath)
+		createDb(cfg.Files.DbPath)
+	} else {
+		log.Fatal("DbPath must be defined in the [Files] section of the config file.")
+	}
+
+	if cfg.Files.TLSCert == "" {
+		cfg.Files.TLSCert = filepath.Join(filepath.Dir(config), "server.crt")
+	}
+	if cfg.Files.TLSKey == "" {
+		cfg.Files.TLSKey = filepath.Join(filepath.Dir(config), "server.key")
+	}
+
+	return cfg
 }
 
 func init() {
@@ -196,36 +240,11 @@ func init() {
 // Main function runs at application start
 func main() {
 	// get evnironment variables
-	configPath, staticFilesPath := getEnvArgs()
+	cfg := getEnvArgs()
 
 	port := 8888
 
 	// read the config file
-	log.Printf("Using configuration file %s", configPath)
-	var cfg Config
-	err := gcfg.ReadFileInto(&cfg, configPath)
-	if err != nil {
-		log.Printf(err.Error())
-		panic("could not open config.ini")
-	}
-
-	if cfg.Files.StaticFilesPath == "" {
-		if staticFilesPath != nil {
-			cfg.Files.StaticFilesPath = *staticFilesPath
-		} else {
-			cfg.Files.StaticFilesPath = "static"
-		}
-	}
-	log.Printf("Static files: %s", cfg.Files.StaticFilesPath)
-
-	log.Printf("config ldapServer: %s", cfg.Auth.LdapServer)
-	if cfg.Files.DbPath != "" {
-		log.Printf("using db: %s", cfg.Files.DbPath)
-		createDb(cfg.Files.DbPath)
-	} else {
-		log.Fatal("DbPath must be defined in the [Files] section of the config file.")
-	}
-
 	if cfg.Net.Port > 0 {
 		port = cfg.Net.Port
 	}
@@ -311,8 +330,14 @@ func main() {
 	}()
 
 	// Finally start serving clients
-	err = http.ServeTLS(socket, nil, filepath.Join(filepath.Dir(configPath), "server.crt"),
-		filepath.Join(filepath.Dir(configPath), "server.key"))
+	go func() {
+		err = http.ListenAndServe(":80", http.HandlerFunc(redirectToHttps))
+		if err != nil {
+			log.Print("Serving on http: ", err)
+		}
+	}()
+	err = http.ServeTLS(socket, nil, cfg.Files.TLSCert,
+		cfg.Files.TLSKey)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
