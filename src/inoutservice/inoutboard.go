@@ -48,6 +48,7 @@ type Person struct {
 	Title        string
 	LastEditor   string
 	LastEditTime time.Time
+	IsDeleted	bool
 }
 
 // cached Config

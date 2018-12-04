@@ -372,3 +372,14 @@ func StatusCodes() (map[int]Status, error) {
 	mutex.Unlock()
 	return statusCodes, nil
 }
+
+// Remove a person from the database
+func RemovePerson(person *Person) error {
+	stmt, err := conn.Prepare("DELETE FROM people WHERE username = ?")
+	defer stmt.Close()
+	res, err := stmt.Exec(person.Username)
+	checkErr(err)
+	_,err = res.RowsAffected()
+	checkErr(err)
+	return err
+}

@@ -12,6 +12,7 @@ import (
 	"strings"
 	_ "strings"
 	"time"
+	"errors"
 )
 
 var authOptions *AuthorizationOptions
@@ -130,8 +131,8 @@ func SanitizeDN(dn string) (string, error) {
 }
 
 // Find a person in LDAP
-func FindUser(username string) (Person, error) {
-	var user Person
+func FindUser(username string) (*Person, error) {
+	var user *Person
 	if authOptions == nil {
 		log.Panicf("Auth options should not be nil")
 	}
@@ -176,13 +177,24 @@ func FindUser(username string) (Person, error) {
 		nil,
 	)
 	res, err := conn.Search(searchRequest)
-	if err != nil || len(res.Entries) != 1 {
+	if err != nil {
 		log.Fatal(err)
+	} 
+	
+	if len(res.Entries) == 0 {
+		return nil, err
+	}
+	
+	if len(res.Entries) > 1 {
+		log.Errorf("Got %i entries for %s from LDAP", len(res.Entries), dn)
+		return nil, errors.New("Got too many results for LDAP query")
 	}
 
 	ldapPerson := res.Entries[0]
 
-	user = Person{
+	//ldapPerson.Printf()
+
+	user = &Person{
 		Username:   ldapPerson.GetAttributeValue("userPrincipalName"),
 		Name:       ldapPerson.GetAttributeValue("cn"),
 		Department: ldapPerson.GetAttributeValue("department"),
@@ -190,6 +202,7 @@ func FindUser(username string) (Person, error) {
 		Mobile:     ldapPerson.GetAttributeValue("mobile"),
 		Office:     ldapPerson.GetAttributeValue("physicalDeliveryOfficeName"),
 		Title:      ldapPerson.GetAttributeValue("title"),
+		IsDeleted:  strings.Contains(ldapPerson.DN, "OU=Previous Employees"),
 	}
 	return user, err
 }
@@ -199,7 +212,7 @@ func FindUser(username string) (Person, error) {
 func CreateUser(username string) (*Person, error) {
 	var err error
 	var user *Person = new(Person)
-	*user, err = FindUser(username)
+	user, err = FindUser(username)
 	if err != nil {
 		return nil, err
 	}
@@ -236,6 +249,12 @@ func UpdateLdap(options AuthorizationOptions) error {
 		updated, err := FindUser(user.Username)
 		if err != nil {
 			log.Printf("Failed to get user %s from the LDAP Server: %s", user.Username, err.Error())
+			continue
+		}
+		if updated == nil || updated.IsDeleted {
+			log.Infof("Removing previous employee %s", user.Username)
+			RemovePerson(user)
+			continue
 		}
 		// and update the database
 		user.Name = updated.Name
