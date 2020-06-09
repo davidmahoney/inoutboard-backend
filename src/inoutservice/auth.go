@@ -4,15 +4,15 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
 	"github.com/leonelquinteros/gorand"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/ldap.v2"
 	"net/http"
 	"strings"
 	_ "strings"
 	"time"
-	"errors"
 )
 
 var authOptions *AuthorizationOptions
@@ -179,12 +179,12 @@ func FindUser(username string) (*Person, error) {
 	res, err := conn.Search(searchRequest)
 	if err != nil {
 		log.Fatal(err)
-	} 
-	
+	}
+
 	if len(res.Entries) == 0 {
 		return nil, err
 	}
-	
+
 	if len(res.Entries) > 1 {
 		log.Errorf("Got %i entries for %s from LDAP", len(res.Entries), dn)
 		return nil, errors.New("Got too many results for LDAP query")

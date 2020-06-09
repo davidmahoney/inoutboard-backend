@@ -4,9 +4,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
 	"github.com/bakins/logrus-middleware"
 	"github.com/coreos/go-systemd/daemon"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/gcfg.v1"
 	"io/ioutil"
 	"net"
@@ -48,7 +48,7 @@ type Person struct {
 	Title        string
 	LastEditor   string
 	LastEditTime time.Time
-	IsDeleted	bool
+	IsDeleted    bool
 }
 
 // cached Config
@@ -346,7 +346,14 @@ func main() {
 			log.Print("Serving on http: ", err)
 		}
 	}()
-	err = http.ServeTLS(socket, nil, cfg.Files.TLSCert,
+	tlsConf := &tls.Config {
+		MinVersion: tls.VersionTLS12,
+	}
+	srv := &http.Server {
+		TLSConfig: tlsConf,
+	}
+
+	err = srv.ServeTLS(socket, cfg.Files.TLSCert,
 		cfg.Files.TLSKey)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)

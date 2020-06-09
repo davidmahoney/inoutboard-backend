@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
 	_ "github.com/mattn/go-sqlite3"
+	log "github.com/sirupsen/logrus"
 	"sync"
 )
 
@@ -379,7 +379,7 @@ func RemovePerson(person *Person) error {
 	defer stmt.Close()
 	res, err := stmt.Exec(person.Username)
 	checkErr(err)
-	_,err = res.RowsAffected()
+	_, err = res.RowsAffected()
 	checkErr(err)
 	return err
 }
