@@ -309,7 +309,7 @@ func main() {
 	http.Handle("/api/statuscodes", l.Handler(AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(statusHandler))), "statuses"))
 	//http.Handle("/api/people", l.Handler(AuthorizationMiddleware(authOptions, AddHeaders(http.HandlerFunc(peopleHandler))), "people"))
 	fs := http.FileServer(http.Dir(cfg.Files.StaticFilesPath))
-	http.Handle("/", fs)
+	http.Handle("/",AddHeaders(fs))
 	log.Printf("Starting service on port %d", port)
 	socket, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
