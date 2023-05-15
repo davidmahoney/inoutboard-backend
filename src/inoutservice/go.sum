@@ -1,5 +1,3 @@
-github.com/a-h/hsts v0.0.0-20170713145656-509101faf0de h1:EA7uAk3mk8uND/JcEnxcHdgE921n3er8ZGYbsyVA498=
-github.com/a-h/hsts v0.0.0-20170713145656-509101faf0de/go.mod h1:N65QR4h5nMsbtGbRX/prBVT33qf0E5qXeVdhLZI/lIA=
 github.com/bakins/logrus-middleware v0.0.0-20180426214643-ce4c6f8deb07 h1:YyWvJqruuX4aBN812F9ex3WXuxdqruVNd5rvww8U9ko=
 github.com/bakins/logrus-middleware v0.0.0-20180426214643-ce4c6f8deb07/go.mod h1:Z+aq7HgFBRFKVDlBpL/cgrb94A9VgwMSlsFAxAJeK6s=
 github.com/bakins/test-helpers v0.0.0-20141028124846-af83df64dc31 h1:tMpES1jlcuk66SuoR/0aTbqyJRjoEBXiSLus2I6U2nE=

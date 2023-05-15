@@ -3,7 +3,6 @@ module github.com/davidmahoney/inoutservice
 go 1.20
 
 require (
-	github.com/a-h/hsts v0.0.0-20170713145656-509101faf0de
 	github.com/bakins/logrus-middleware v0.0.0-20180426214643-ce4c6f8deb07
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf
 	github.com/leonelquinteros/gorand v1.0.2
